@@ -1,16 +1,13 @@
 # Set the working directory to the specified path
-setwd("NERA/TFM/SCRIPT/")
+setwd("~/NERA/TFM/SCRIPT")
 
 #Libraries:
 library(dplyr)
 library(stringr)
 
+
 #####################GENE SELECTION########################################
 
-
-
-
-#####################DATA PREPROCESSING########################################
 
 # Reads the content of the file "ASC_Spain.PASS.annotated.txt" into a character
 # vector "text", where each line of the file becomes an element of the vector
@@ -40,18 +37,43 @@ data_matrix <- data_matrix[-1,]
 data_df <- as.data.frame(data_matrix)
 rm(data_matrix)
 
-#Creates a new data frame with a subset of the rows of "data_df".
-data_df_test <- head(data_df, 50)
+
+data_df_NA <- data.frame(lapply(data_df, function(x) ifelse(is.na(x) | x == "", "NA", x)))
+data_df_NA$Chr <- paste0("chr", data_df_NA$Chr)
+data_df_NA$Start <- as.numeric(data_df_NA$Start)
+data_df_NA$Start <- data_df_NA$Start - 1
+
+
+write.table(data_df_NA, "Exoma_HGUGM_NA.bed", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+
+system("bedtools intersect -a Exoma_HGUGM_NA.bed -b GENE_BBDD.bed > intersect.bed")
+
+text <- readLines("intersect.bed")
+max_cols <- max(sapply(strsplit(text, "\t"), length))
+data_matrix <- matrix(nrow = length(text), ncol = max_cols)
+for (i in 1:length(text)) {
+  line <- strsplit(text[i], "\t")[[1]]
+  data_matrix[i, 1:length(line)] <- line}
+colnames(data_matrix) <- colnames(data_df)
+data_matrix <- data_matrix[-1,]
+data_df_ASD_genes <- as.data.frame(data_matrix)
+rm(data_matrix)
+rm(data_df)
+
+
+#####################DATA PREPROCESSING########################################
+
 
 # Replaces the "|" character with "," in the "GATK.samples" column of "data_df_test"
 # and splits each element of the column by "," to create a list.
-data_df_test$GATK.samples <- gsub("\\|", ",", data_df_test$GATK.samples)
-data_df_test$GATK.samples <- gsub("_", "-", data_df_test$GATK.samples)
+data_df_ASD_genes$GATK.samples <- gsub("\\|", ",", data_df_ASD_genes$GATK.samples)
+data_df_ASD_genes$GATK.samples <- gsub("_", "-", data_df_ASD_genes$GATK.samples)
 
 #Loops through each line and each ID of the row, checks whether the ID already
 #contains the substring "G01-GEA-"; if not it replaces "GEA" with "G01-GEA-".
 #Finally, it will join the modified IDs back together and collapse them with a comma.
-data_df_test <- data_df_test %>%
+data_df_ASD_genes <- data_df_ASD_genes %>%
   mutate(GATK.samples = strsplit(as.character(GATK.samples), ",")) %>%
   mutate(GATK.samples = lapply(GATK.samples, function(ids) {
     sapply(ids, function(id) {
@@ -71,36 +93,36 @@ add_hyphen <- function(x) {
 }
 
 # Homogenize the sample names
-data_df_test <- data_df_test %>%
+data_df_ASD_genes <- data_df_ASD_genes %>%
   mutate(GATK.samples = str_pad(GATK.samples, width = 15, side = "right", pad = " ")) %>%
   mutate(GATK.samples = str_split(GATK.samples, ",")) %>%
   mutate(GATK.samples = lapply(GATK.samples, add_hyphen)) %>%
   mutate(GATK.samples = sapply(GATK.samples, function(x) paste(x, collapse = ","))) 
 
 # Split the sample IDs into separate columns
-sample_cols <- strsplit(data_df_test$GATK.samples, ",")
-max_cols <- max(lengths(sample_cols))
+sample_cols <- strsplit(data_df_ASD_genes$GATK.samples, ",")
+max_cols <- max(lengths(data_df_ASD_genes))
 sample_df <- matrix(NA, nrow = max_cols, ncol = length(sample_cols))
 for (i in seq_along(sample_cols)) {
-  curr_cols <- length(sample_cols[[i]])
-  sample_df[1:curr_cols, i] <- sample_cols[[i]]
+  sample_df[1:length(sample_cols[[i]]), i] <- sample_cols[[i]]
 }
 
 sample_df <- gsub("(?<=-)(\\d)(?=-|$)", "00\\1", sample_df, perl = TRUE)
 sample_df <- gsub("(?<=-)(\\d{2})(?=-|$)", "0\\1", sample_df, perl = TRUE)
 
 dataframe_concat <- apply(sample_df, 2, paste0, collapse = ",")
-data_df_test$Padded_IDs <- dataframe_concat
+data_df_ASD_genes$Padded_IDs <- dataframe_concat
+
 
 #Remove all "NA" instances from rows of Padded IDs
-data_df_test$Padded_IDs <- gsub("NA,", "", data_df_test$Padded_IDs)
-data_df_test$Padded_IDs <- gsub(",NA", "", data_df_test$Padded_IDs)
+data_df_ASD_genes$Padded_IDs <- gsub("NA,", "", data_df_ASD_genes$Padded_IDs)
+data_df_ASD_genes$Padded_IDs <- gsub(",NA", "", data_df_ASD_genes$Padded_IDs)
 
 # Loop through the IDs column of data_df
-for (i in 1:nrow(data_df_test)) {
+for (i in 1:nrow(data_df_ASD_genes)) {
   
   # Split IDs into a vector by ";"
-  ids <- unlist(strsplit(as.character(data_df_test$Padded_IDs[i]), ","))
+  ids <- unlist(strsplit(as.character(data_df_ASD_genes$Padded_IDs[i]), ","))
   
   # Loop through the vector of IDs
   for (j in 1:length(ids)) {
@@ -114,8 +136,15 @@ for (i in 1:nrow(data_df_test)) {
   }
   
   # Combine modified IDs into a single string separated by ";"
-  data_df_test$Padded_IDs[i] <- paste(ids, collapse = ",")
+  data_df_ASD_genes$Padded_IDs[i] <- paste(ids, collapse = ",")
 }
+
+
+
+
+
+
+###############################################################################
 
 
 # Define function to extract substrings from a string
