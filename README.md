@@ -1,4 +1,4 @@
-# Trabajo de fin de máster Nermina Logo Lendo
+# Trabajo de fin de máster 
 
 ## Autor: Nermina Logo Lendo
 
