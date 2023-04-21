@@ -8,4 +8,3 @@ Este repositorio contiene código, manuales , (...) del tabajo de fin de máster
 
 
 Este trabajo...
-test1
