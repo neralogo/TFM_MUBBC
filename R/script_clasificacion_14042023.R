@@ -1,6 +1,5 @@
 # Load required libraries
 library(caret)
-library(ROSE)
 library(DMwR)
 library(randomForest)
 library(dplyr)
@@ -13,66 +12,85 @@ library(mltools)
 
 
 ##########################LOAD DDBB############################################
-setwd("C:/Users/Nera/Desktop/TFM_MUBBC/6. PRUEBAS DECISION TREE")
+setwd("C:/Users/Nera/Desktop/TFM_MUBBC_UAM")
+df <- read.csv("BBDD_ASC_CLASIFICACION.csv", sep = ";", header = TRUE)
 
-df <- read.csv("data.csv", sep = ";", header = FALSE)
-col_names <- c("Codigounico", "Edad", "Sexo", "REGRESION",
-               "EDADINSINT", "SINTDIGESTIVOS", "EPILEPSIA",
-               "ADOSss", "CI", "exoma")
 
-colnames(df) <- col_names
-
+#Cambio a numerico para que limpie cualquier texto que hay en la BBDD
 df <- df%>%mutate_at(vars(2:9), as.numeric)
-df$exoma <- as.factor(df$exoma)
+
+
+
+
+df <- df %>%
+  mutate(Exome = recode_factor(Exome, "0" = "Negative", "1" = "Positive")) %>%
+  mutate(Gender = recode_factor(Gender, "1" = "Male", "2" = "Female")) %>%
+  mutate(Epilepsy = recode_factor(Epilepsy, "0" = "No", "1" = "Probably", "2" = "Yes")) %>%
+  mutate(Regression = recode_factor(Regression, "0" = "No", "1" = "Yes")) %>%
+  mutate(Delivery_problems = recode_factor(Delivery_problems, "0" = "No", "1" = "Yes")) %>%
+  mutate(Age_symptoms = recode_factor(Age_symptoms, "0" = "<1", "1" = "1-3", "2" = ">3"))
 
 
 #Comprobamos la división "equitativa" entre los pacientes con y sin resultados
 #positivos y negativos del exoma
-table(df$exoma)
+table(df$Exome)
 
-#
-df <- df[,c(2:10)]
+#We remove the identifiers 
+df_no_ID <- df[,c(2:10)]
 
 
 ##########################PREPROCESS DDBB#####################################
 
-#df <- preProcess(df[,-9], method = "medianImpute", na.remove = FALSE, k = 5)
+#Eliminamos las filas de las variables que no vamos a imputar, como la edad
+#de los padres
+df_no_ID <- df_no_ID[complete.cases(df_no_ID[, c("Age_F_Birth", "Age_symptoms")]), ]
 
 
+#Comprobamos el porcentaje de valores perdidos de las columnas que vamos a imputar:
+mean(is.na(df_no_ID$Age_walking)) * 100
+mean(is.na(df_no_ID$Regression)) * 100
+mean(is.na(df_no_ID$Epilepsy)) * 100
 
+#imputamos los valores perdidos (no tendremos en cuenta que una de las variables
+#tiene más del 18% de NAs)
+mice_object <- mice(df_no_ID[,-9], m = 5, maxit = 50, meth = c("logreg",
+          "pmm", "pmm", "polyreg", "pmm", "logreg", "logreg", "polyreg"))
+
+imputed_data <- complete(mice_object)
+
+imputed_data <- cbind(imputed_data, df_no_ID$Exome)
+
+imputed_data <- dplyr::rename(imputed_data, "Exome" = "df_no_ID$Exome")
 ##########################BALANCE DDBB######################################
 # Set seed for reproducibility
 set.seed(677)
 
 # Create a training-validation partition
-trainIndex_BALANCE <- createDataPartition(df$exoma, p = 0.7, list = FALSE)
-train_BD <- df[trainIndex_BALANCE, ]
-test_BD <- df[-trainIndex_BALANCE, ]
+trainIndex_BALANCE <- createDataPartition(imputed_data$Exome, p = 0.7, list = FALSE)
+train_BD <- imputed_data[trainIndex_BALANCE, ]
+test_BD <- imputed_data[-trainIndex_BALANCE, ]
 
 # Define the control object for train function
 ctrl <- trainControl(method = "cv", number = 5, summaryFunction = twoClassSummary, classProbs = TRUE)
 
 # Define a list of sampling methods
-sampling_methods <- c("none", "under", "over", "adasyn", "smote")
+sampling_methods <- c("none", "under", "over", "smotenc")
 
 # Train random forest models using different balance methods
 results <- list()
 for (method in sampling_methods) {
   if (method == "none") {
-    model <- caret::train(exoma ~ ., data = train_BD, method = "rf", trControl = ctrl, importance = TRUE)
+    model <- caret::train(Exome ~ ., data = train_BD, method = "rf", trControl = ctrl, importance = TRUE)
   } else if (method == "down") {
-    train_balanced <- caret::downSample(x = train_BD[, -9], y = train$exoma)
-    train_balanced$exoma <- as.factor(train_balanced$Class)
-    model <- caret::train(exoma ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
+    train_balanced <- caret::downSample(x = train_BD[, -9], y = train_BD$Exome)
+    train_balanced$Exome <- as.factor(train_balanced$Class)
+    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
   } else if (method == "over") {
-    train_balanced <- caret::upSample(x = train_BD[, -9], y = train_BD$exoma, yname = "exoma")
-    model <- caret::train(exoma ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
-  } else if (method == "adasyn") {
-    train_balanced <- ADAS(train_BD[,-9], train_BD$exoma, K=5)
-    model <- caret::train(class ~ ., data = train_balanced$data, method = "rf", trControl = ctrl, importance = TRUE)
-  } else if (method == "smote") {
-    train_balanced <- DMwR::SMOTE(exoma ~., train_BD, perc.over = 125, perc.under = 100)
-    model <- caret::train(exoma ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
+    train_balanced <- caret::upSample(x = train_BD[, -9], y = train_BD$Exome, yname = "Exome")
+    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
+  } else if (method == "smotenc") {
+    train_balanced <- smotenc(train_BD, var = "Exome", k = 5, over_ratio = 1)
+    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
   }
   results[[method]] <- model
 }
@@ -82,14 +100,14 @@ evaluations <- list()
 for (method in sampling_methods) {
   model <- results[[method]]
   pred_prob <- predict(model, newdata = test_BD, type = "prob")[, 2]
-  pred_class <- ifelse(pred_prob > 0.5, "positive", "negative")
+  pred_class <- ifelse(pred_prob > 0.5, "Positive", "Negative")
   evaluations[[method]] <- data.frame(
     Method = method,
-    ROC = roc(test_BD$exoma, pred_prob)$auc,
-    Precision = precision(as.factor(pred_class), test_BD$exoma, positive = "exoma"),
-    Sensitivity = recall(as.factor(pred_class), test_BD$exoma, positive = "exoma"),
-    F1 = caret::F_meas(as.factor(pred_class), test_BD$exoma, positive = "exoma"),
-    MCC = mcc(as.factor(pred_class), test_BD$exoma)
+    ROC = roc(test_BD$Exome, pred_prob)$auc,
+    Precision = precision(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
+    Sensitivity = recall(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
+    F1 = caret::F_meas(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
+    MCC = mcc(as.factor(pred_class), test_BD$Exome)
   )
 }
 
@@ -127,27 +145,24 @@ for (method in sampling_methods) {
 }
 
 
-if (best_method == "adasyn") {
-  # Apply ROSE to balance the data
-  balanced_df <- ROSE(exoma ~ ., data = df, seed = 123)$data
-} else if (best_method == "over") {
-  # Apply undersampling to balance the data
-  balanced_df <- caret::upSample(x = df[, -9], y = df$exoma, yname = "exoma")
-} else if (best_method == "under") {
+if (best_method == "over") {
   # Apply oversampling to balance the data
-  balanced_df <- caret::downSample(x = df[, -9], y = df$exoma)
-} else if (best_method == "smote") {
-  # Apply SMOTE to balance the data
-  balanced_df <- SMOTE(exoma ~., df, perc.over = 125, perc.under = 100)
+  balanced_df <- caret::upSample(x = imputed_data[, -9], y = imputed_data$Exome, yname = "Exome")
+} else if (best_method == "under") {
+  # Apply undersampling to balance the data
+  balanced_df <- caret::downSample(x = imputed_data[, -9], y = imputed_data$Exome)
+} else if (best_method == "smotenc") {
+  # Apply SMOTENC to balance the data
+  balanced_df <- smotenc(imputed_data, var = "Exome", k = 5, over_ratio = 1)
 } else if (best_method == "none") {
   # No balancing method specified
-  balanced_df <- df
+  balanced_df <- imputed_data
 }
 
 
 ##########################RANDOM FOREST APLICATION##############################
 
-trainIndex_RF <- createDataPartition(balanced_df$exoma, p = 0.7, list = FALSE)
+trainIndex_RF <- createDataPartition(balanced_df$Exome, p = 0.7, list = FALSE)
 train_RF <- balanced_df[trainIndex_RF, ]
 test_RF <- balanced_df[-trainIndex_RF, ]
 
@@ -160,7 +175,7 @@ k <- 10
 cv_accuracies <- rep(0, k)
 
 # Create the folds using the createFolds function from the caret package
-folds <- createFolds(train_RF$exoma, k = k)
+folds <- createFolds(train_RF$Exome, k = k)
 
 # Perform k-fold cross-validation
 for (i in 1:k) {
@@ -172,13 +187,13 @@ for (i in 1:k) {
   valid_cv <- train_RF[valid_indices, ]
   
   # Train random forest model on the train_cv data
-  rf_model <- randomForest(exoma ~ ., data = train_cv, importance = TRUE, proximity = TRUE, ntree = 500)
+  rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, proximity = TRUE, ntree = 500)
   
   # Make predictions on the validation set
   rf_pred <- predict(rf_model, newdata = valid_cv)
   
   # Calculate accuracy for this fold and store it in the cv_accuracies vector
-  confusion_matrix <- table(valid_cv$exoma, rf_pred)
+  confusion_matrix <- table(valid_cv$Exome, rf_pred)
   accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
   cv_accuracies[i] <- accuracy
 }
@@ -188,14 +203,14 @@ mean_accuracy <- mean(cv_accuracies)
 sd_accuracy <- sd(cv_accuracies)
 
 # Train the final random forest model on the full train_RF data
-rf_model <- randomForest(exoma ~ ., data = train_RF, importance = TRUE, 
+rf_model <- randomForest(Exome ~ ., data = train_RF, importance = TRUE, 
                          proximity = TRUE, ntree = 1000, mtry = 5, maxnodes = 7)
 
 # Make predictions on the test set
 rf_pred <- predict(rf_model, newdata = test_RF)
 
 # Print the confusion matrix, accuracy, mean accuracy, and standard deviation
-confusion_matrix <- table(test_RF$exoma, rf_pred)
+confusion_matrix <- table(test_RF$Exome, rf_pred)
 accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
 cat("Confusion Matrix:\n")
 print(confusion_matrix)
@@ -203,6 +218,19 @@ cat("\nAccuracy on Test Set:", accuracy)
 cat("\nMean Accuracy over", k, "Folds:", mean_accuracy)
 cat("\nStandard Deviation of Accuracies over", k, "Folds:", sd_accuracy)
 
+
+# Get variable importance measures
+var_imp <- randomForest::importance(rf_model)
+
+# Sort the variables by importance (in descending order)
+var_imp <- var_imp[order(var_imp[,4], decreasing = TRUE), ]
+
+# Print the variable importance table
+print(var_imp)
+
+
+
+#########################Plot tree#############################################
 
 plot.getTree(rf_model)
 
