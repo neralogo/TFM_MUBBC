@@ -1,6 +1,3 @@
-# Set the working directory to the specified path
-setwd("~/NERA/TFM/SCRIPT")
-
 #Libraries:
 library(dplyr)
 library(stringr)
@@ -11,7 +8,7 @@ library(stringr)
 
 # Reads the content of the file "ASC_Spain.PASS.annotated.txt" into a character
 # vector "text", where each line of the file becomes an element of the vector
-text <- readLines("EXOMAS_HGUGM_AUTISMO1Y2/Exomas_HGUGM_autismo.tab.gz")
+text <- readLines("home/nodotea/NERA/Exomas_HGUGM_autismo/")
 
 # Calculates the maximum number of columns in the tab-separated values file by 
 # splitting each line of the file by tabs and finding the maximum number of 
