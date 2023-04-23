@@ -1,14 +1,15 @@
 # Load required libraries
-library(caret)
-library(DMwR)
-library(randomForest)
 library(dplyr)
-library(ggplot2)
+library(mice)
+library(caret)
+library(themis)
 library(pROC)
-library(plyr)
-library(ROCR)
-library(smotefamily)
+library(randomForest)
+library(ggplot2)
 library(mltools)
+
+library(DMwR)
+library(plyr)
 
 
 ##########################LOAD DDBB############################################
@@ -53,7 +54,7 @@ mean(is.na(df_no_ID$Epilepsy)) * 100
 
 #imputamos los valores perdidos (no tendremos en cuenta que una de las variables
 #tiene más del 18% de NAs)
-mice_object <- mice(df_no_ID[,-9], m = 5, maxit = 50, meth = c("logreg",
+mice_object <- mice(df_no_ID[,-9], m = 10, maxit = 100, meth = c("logreg",
           "pmm", "pmm", "polyreg", "pmm", "logreg", "logreg", "polyreg"))
 
 imputed_data <- complete(mice_object)
@@ -104,8 +105,8 @@ for (method in sampling_methods) {
   evaluations[[method]] <- data.frame(
     Method = method,
     ROC = roc(test_BD$Exome, pred_prob)$auc,
-    Precision = precision(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
-    Sensitivity = recall(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
+    Precision = caret::precision(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
+    Sensitivity = caret::recall(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
     F1 = caret::F_meas(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
     MCC = mcc(as.factor(pred_class), test_BD$Exome)
   )
@@ -133,16 +134,16 @@ ggplot(evaluations_long, aes(x = Method, y = value, fill = variable)) +
 
 
 # Create an empty plot
-plot(NULL, xlim=c(0,1), ylim=c(0,1), xlab="False Positive Rate", ylab="True Positive Rate", main="Receiver Operating Characteristic (ROC) Curve")
+#plot(NULL, xlim=c(0,1), ylim=c(0,1), xlab="False Positive Rate", ylab="True Positive Rate", main="Receiver Operating Characteristic (ROC) Curve")
 
 # Add curves for each sampling method
-for (method in sampling_methods) {
-  model <- results[[method]]
-  pred_prob <- predict(model, newdata = test_BD, type = "prob")[, 2]
-  roc_obj <- roc(test_BD$exoma, pred_prob, plot=TRUE, col=ifelse(method=="none", "black", "red"))
-  auc <- round(auc(roc_obj), 3)
-  legend("bottomright", paste(method, " (AUC=", auc, ")", sep=""), col=ifelse(method=="none", "black", "red"), lty=1)
-}
+#for (method in sampling_methods) {
+#  model <- results[[method]]
+#  pred_prob <- predict(model, newdata = test_BD, type = "prob")[, 2]
+#  roc_obj <- roc(test_BD$exoma, pred_prob, plot=TRUE, col=ifelse(method=="none", "black", "red"))
+#  auc <- round(auc(roc_obj), 3)
+#  legend("bottomright", paste(method, " (AUC=", auc, ")", sep=""), col=ifelse(method=="none", "black", "red"), lty=1)
+#}
 
 
 if (best_method == "over") {
@@ -167,15 +168,11 @@ train_RF <- balanced_df[trainIndex_RF, ]
 test_RF <- balanced_df[-trainIndex_RF, ]
 
 
-
-# Set the number of folds for cross-validation
-k <- 10
-
 # Create an empty vector to store the accuracies for each fold
 cv_accuracies <- rep(0, k)
 
 # Create the folds using the createFolds function from the caret package
-folds <- createFolds(train_RF$Exome, k = k)
+folds <- createFolds(train_RF$Exome, k = 10)
 
 # Perform k-fold cross-validation
 for (i in 1:k) {
@@ -187,7 +184,7 @@ for (i in 1:k) {
   valid_cv <- train_RF[valid_indices, ]
   
   # Train random forest model on the train_cv data
-  rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, proximity = TRUE, ntree = 500)
+  rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, proximity = TRUE, ntree = 1000)
   
   # Make predictions on the validation set
   rf_pred <- predict(rf_model, newdata = valid_cv)
@@ -224,15 +221,7 @@ var_imp <- randomForest::importance(rf_model)
 
 # Sort the variables by importance (in descending order)
 var_imp <- var_imp[order(var_imp[,4], decreasing = TRUE), ]
+var_imp <- as.data.frame(var_imp)
 
 # Print the variable importance table
 print(var_imp)
-
-
-
-#########################Plot tree#############################################
-
-plot.getTree(rf_model)
-
-
-
