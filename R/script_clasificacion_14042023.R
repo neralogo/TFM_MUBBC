@@ -7,6 +7,10 @@ library(pROC)
 library(randomForest)
 library(ggplot2)
 library(mltools)
+library(ggplot2)
+library(ggtext)
+
+
 
 library(DMwR)
 library(plyr)
@@ -167,12 +171,12 @@ trainIndex_RF <- createDataPartition(balanced_df$Exome, p = 0.7, list = FALSE)
 train_RF <- balanced_df[trainIndex_RF, ]
 test_RF <- balanced_df[-trainIndex_RF, ]
 
-
+k = 10
 # Create an empty vector to store the accuracies for each fold
 cv_accuracies <- rep(0, k)
 
 # Create the folds using the createFolds function from the caret package
-folds <- createFolds(train_RF$Exome, k = 10)
+folds <- createFolds(train_RF$Exome, k = k)
 
 # Perform k-fold cross-validation
 for (i in 1:k) {
