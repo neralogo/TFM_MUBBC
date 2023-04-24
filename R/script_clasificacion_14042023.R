@@ -1,18 +1,31 @@
 # Load necessary packages
 
-library(dplyr)      # Provides a set of functions for data manipulation and transformation
+library(dplyr)      # Provides a set of functions for data manipulation and 
+#transformation
 library(mice)       # Provides multiple imputation for missing data
-library(caret)      # Provides a set of functions for training and evaluating predictive models
+library(caret)      # Provides a set of functions for training and evaluating 
+#predictive models
 library(themis)     # Provides functions for dealing with imbalanced data
-library(randomForest)  # Provides functions for building random forests, an ensemble learning method for classification, regression and other tasks
+library(randomForest)  # Provides functions for building random forests, an 
+#ensemble learning method for classification, regression and other tasks
 library(ggplot2)    # Provides a set of functions for data visualization
 library(mltools)    # Provides a set of functions for machine learning tasks
-library(ggtext)     # Provides a set of functions for using formatted text in ggplot2 graphics
-library(pROC)
+library(ggtext)     # Provides a set of functions for using formatted text in 
+#ggplot2 graphics
+library(pROC)       # Provides functions for analyzing and visualizing ROC curves
+
+# Sets the seed for reproducibility
+set.seed(677)
+
+
+############################### DATA LOADING ###################################
 
 # Set working directory and read in data from CSV file
 setwd("C:/Users/Nera/Desktop/TFM_MUBBC_UAM")
 df <- read.csv("BBDD_ASC_CLASIFICACION.csv", sep = ";", header = TRUE)
+
+
+############################ DATA PREPROCESSING ################################
 
 # Convert columns 2-9 to numeric data type 
 df <- df%>%mutate_at(vars(2:9), as.numeric)
@@ -21,10 +34,13 @@ df <- df%>%mutate_at(vars(2:9), as.numeric)
 df <- df %>%
   mutate(Exome = recode_factor(Exome, "0" = "Negative", "1" = "Positive")) %>%
   mutate(Gender = recode_factor(Gender, "1" = "Male", "2" = "Female")) %>%
-  mutate(Epilepsy = recode_factor(Epilepsy, "0" = "No", "1" = "Probably", "2" = "Yes")) %>%
+  mutate(Epilepsy = recode_factor(Epilepsy, "0" = "No", "1" = "Probably", 
+                                                          "2" = "Yes")) %>%
   mutate(Regression = recode_factor(Regression, "0" = "No", "1" = "Yes")) %>%
-  mutate(Delivery_problems = recode_factor(Delivery_problems, "0" = "No", "1" = "Yes")) %>%
-  mutate(Age_symptoms = recode_factor(Age_symptoms, "0" = "<1", "1" = "1-3", "2" = ">3"))
+  mutate(Delivery_problems = recode_factor(Delivery_problems, "0" = "No", 
+                                                            "1" = "Yes")) %>%
+  mutate(Age_symptoms = recode_factor(Age_symptoms, "0" = "<1", "1" = "1-3", 
+                                                              "2" = ">3"))
 
 # Remove rows with missing values in specific columns
 df_no_ID <- df[,c(2:10)]
@@ -35,15 +51,20 @@ df_no_ID <- df_no_ID[complete.cases(df_no_ID[, c("Age_F_Birth", "Age_symptoms")]
 table(df_no_ID$Exome)
 my_colors <- c("#600000", "#004400")
 freq_table <- table(df_no_ID$Exome)
-barplot(freq_table, main = "Proportion", xlab = "Exome", ylab = "Frequency", col = my_colors)
+barplot(freq_table, main = "Proportion", xlab = "Exome", ylab = "Frequency",
+        col = my_colors)
 
 # Calculate rows with missing values in specific columns
 mean(is.na(df_no_ID$Age_walking)) * 100
 mean(is.na(df_no_ID$Regression)) * 100
 mean(is.na(df_no_ID$Epilepsy)) * 100
 
+
+############################## DATA IMPUTATION #################################
+
 # Run multiple imputation on the data using the mice package
-mice_object <- mice(df_no_ID[,-9], m = 5, maxit = 50, method = c("", "", "", "polyreg", "pmm", "logreg", "", ""))
+mice_object <- mice(df_no_ID[,-9], m = 5, maxit = 50, method = c("", "", "",
+                                        "polyreg", "pmm", "logreg", "", ""))
 
 # Retrieve the imputed data from the mice object
 imputed_data <- complete(mice_object)
@@ -55,13 +76,15 @@ imputed_data <- cbind(imputed_data, df_no_ID$Exome)
 imputed_data <- dplyr::rename(imputed_data, "Exome" = "df_no_ID$Exome")
 
 # Create a histogram of the "Age_walking" column in the original data
-hist(df_no_ID$Age_walking, main = "Distribution before imputing", xlab = "Age_walking")
+hist(df_no_ID$Age_walking, main = "Distribution before imputing", 
+     xlab = "Age_walking")
 
 #Create a histogram of the "Age_walking" column in the imputed data
-hist(imputed_data$Age_walking, main = "Distribution after imputing", xlab = "Age_walking")
+hist(imputed_data$Age_walking, main = "Distribution after imputing", 
+     xlab = "Age_walking")
 
-# Sets the seed for reproducibility
-set.seed(677)
+
+############################## DATA BALANCING ##################################
 
 # Create training and testing partitions to evaluate the balancing models
 trainIndex_BALANCE <- createDataPartition(imputed_data$Exome, p = 0.7, list = FALSE)
@@ -69,7 +92,8 @@ train_BD <- imputed_data[trainIndex_BALANCE, ]
 test_BD <- imputed_data[-trainIndex_BALANCE, ]
 
 # Set up the train control parameters
-ctrl <- trainControl(method = "cv", number = 5, summaryFunction = twoClassSummary, classProbs = TRUE)
+ctrl <- trainControl(method = "cv", number = 5, summaryFunction = twoClassSummary, 
+                     classProbs = TRUE)
 
 # Define the sampling methods to use
 sampling_methods <- c("none", "under", "over", "smotenc")
@@ -82,22 +106,28 @@ for (method in sampling_methods) {
   
   # Use the "none" method as the baseline (no method)
   if (method == "none") {
-    model <- caret::train(Exome ~ ., data = train_BD, method = "rf", trControl = ctrl, importance = TRUE)
+    model <- caret::train(Exome ~ ., data = train_BD, method = "rf", 
+                          trControl = ctrl, importance = TRUE)
   } 
   # Use the undersampling method to balance the classes
   else if (method == "down") {
-    train_balanced <- caret::downSample(x = train_BD[, -9], y = train_BD$Exome, yname = "Exome")
-    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
+    train_balanced <- caret::downSample(x = train_BD[, -9], y = train_BD$Exome, 
+                                        yname = "Exome")
+    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
+                          trControl = ctrl, importance = TRUE)
   } 
   # Use the oversampling method to balance the classes
   else if (method == "over") {
-    train_balanced <- caret::upSample(x = train_BD[, -9], y = train_BD$Exome, yname = "Exome")
-    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
+    train_balanced <- caret::upSample(x = train_BD[, -9], y = train_BD$Exome, 
+                                      yname = "Exome")
+    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
+                          trControl = ctrl, importance = TRUE)
   } 
   # Use the SMOTE-NC method to balance the classes 
   else if (method == "smotenc") {
     train_balanced <- smotenc(train_BD, var = "Exome", k = 5, over_ratio = 1)
-    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", trControl = ctrl, importance = TRUE)
+    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
+                          trControl = ctrl, importance = TRUE)
   }
   
   # Store the results in the list
@@ -123,8 +153,10 @@ for (method in sampling_methods) {
   evaluations[[method]] <- data.frame(
     Method = method,
     ROC = roc(test_BD$Exome, pred_prob)$auc,
-    Precision = caret::precision(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
-    Sensitivity = caret::recall(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
+    Precision = caret::precision(as.factor(pred_class), test_BD$Exome, 
+                                 positive = "Exome"),
+    Sensitivity = caret::recall(as.factor(pred_class), test_BD$Exome, 
+                                positive = "Exome"),
     F1 = caret::F_meas(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
     MCC = mcc(as.factor(pred_class), test_BD$Exome)
   )
@@ -152,7 +184,8 @@ ggplot(evaluations_long, aes(x = Method, y = value, fill = variable)) +
 if (best_method == "over") {
   
   # Upsample the minority class using caret's upSample function
-  balanced_df <- caret::upSample(x = imputed_data[, -9], y = imputed_data$Exome, yname = "Exome")
+  balanced_df <- caret::upSample(x = imputed_data[, -9], y = imputed_data$Exome, 
+                                 yname = "Exome")
 } else if (best_method == "under") {
   # Downsample the majority class using caret's downSample function
   balanced_df <- caret::downSample(x = imputed_data[, -9], y = imputed_data$Exome)
@@ -163,6 +196,9 @@ if (best_method == "over") {
   # If the best method is "none", use the original imputed data without any sampling
   balanced_df <- imputed_data
 }
+
+
+############################### RF ALGORITHM ###################################
 
 # Split the balanced data into training and test sets for the RF algorithm
 trainIndex_RF <- createDataPartition(balanced_df$Exome, p = 0.7, list = FALSE)
@@ -188,7 +224,8 @@ for (i in 1:k) {
   valid_cv <- train_RF[valid_indices, ]
   
   # Train random forest model on the training set
-  rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, proximity = TRUE, ntree = 1000)
+  rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
+                           proximity = TRUE, ntree = 1000)
   
   # Make predictions on the validation set using the trained model
   rf_pred <- predict(rf_model, newdata = valid_cv)
