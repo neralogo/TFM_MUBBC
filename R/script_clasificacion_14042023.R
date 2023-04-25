@@ -316,66 +316,6 @@ cat("\nAccuracy on test set:", accuracy)
 cat("\n\nConfusion Matrix:")
 print(confusion_matrix)
 
-# Loop over each combination of hyperparameters
-for (maxnodes in maxnodes_values) {
-  for (ntree in ntree_values) {
-    
-    # Create k folds for cross-validation
-    folds <- createFolds(train_RF$Exome, k = k)
-    
-    # Loop over each fold of cross-validation
-    for (i in 1:k) {
-      
-      # Split the data into training and validation sets for this fold
-      train_indices <- unlist(folds[-i])
-      valid_indices <- folds[[i]]
-      train_cv <- train_RF[train_indices, ]
-      valid_cv <- train_RF[valid_indices, ]
-      
-      # Train random forest model on the training set
-      rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
-                               proximity = TRUE, ntree = ntree, maxnodes = maxnodes,
-                               mtry = bestmtry)
-      
-      # Make predictions on the validation set using the trained model
-      rf_pred <- predict(rf_model, newdata = valid_cv)
-      
-      # Calculate the confusion matrix and accuracy score for this fold
-      confusion_matrix <- table(valid_cv$Exome, rf_pred)
-      accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
-      cv_accuracies[i] <- accuracy
-    }
-    
-    # Calculate the mean and standard deviation of the accuracy scores over 
-    # all folds of cross-validation
-    mean_accuracy <- mean(cv_accuracies)
-    sd_accuracy <- sd(cv_accuracies)
-    
-    # Train a random forest model
-    rf_model <- randomForest(Exome ~ ., data = train_RF, importance = TRUE, 
-                             mtry = bestmtry, proximity = TRUE, ntree = ntree, 
-                             maxnodes = maxnodes)
-    
-    # Make predictions on the test set using the trained model
-    rf_pred <- predict(rf_model, newdata = test_RF)
-    
-    # Calculate the confusion matrix and accuracy of the predictions
-    confusion_matrix <- table(test_RF$Exome, rf_pred)
-    accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
-    
-    # Print the confusion matrix and accuracy on the test set, 
-    # as well as the hyperparameters used
-    cat("\nMaxnodes:", maxnodes, "NTree:", ntree)
-    cat("\nConfusion Matrix:\n")
-    print(confusion_matrix)
-    cat("\nAccuracy on Test Set:", accuracy)
-    
-    # Print the mean accuracy and standard deviation over k folds
-    cat("\nMean Accuracy over", k, "Folds:", mean_accuracy)
-    cat("\nStandard Deviation of Accuracies over", k, "Folds:", sd_accuracy)
-  }
-}
-
 
 # Calculate and print the variable importance of the model
 var_imp <- randomForest::importance(rf_model)
@@ -384,3 +324,19 @@ var_imp <- as.data.frame(var_imp)
 print(var_imp)
 varImpPlot(rf_model)
 
+accuracy_df <- as.data.frame(accuracy_matrix)
+
+
+scatter3D(x = accuracy_df$Maxnodes, y = accuracy_df$NTree, z = accuracy_df$Accuracy,
+          phi = 15, theta = 30, colvar = accuracy_df$Accuracy,
+          pch = 16, cex = 2, type = "h", ticktype = "detailed", 
+          xlab = "Maxnodes", ylab = "", zlab = "",
+          main = "Accuracy vs Maxnodes and NTree")
+
+dims <- par("usr")
+x1 <- dims[1]+ 0.81*diff(dims[1:2])
+y1 <- dims[3]+ 0.15*diff(dims[3:4])
+x2 <- dims[1]+ 0.49*diff(dims[1:2])
+y2 <- dims[3]- 0.009*diff(dims[3:4])
+text(x1,y1,expression(NTree),srt=60)
+text(y2,x2,expression(Accuracy),srt=90)
