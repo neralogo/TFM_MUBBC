@@ -206,40 +206,72 @@ train_RF <- balanced_df[trainIndex_RF, ]
 test_RF <- balanced_df[-trainIndex_RF, ]
 
 # Set the number of folds for cross-validation
-k = 10
+k <- 10
 
 # Initialize an array to store the accuracy scores for each fold of cross-validation
 cv_accuracies <- rep(0, k)
 
-# Create k folds for cross-validation
-folds <- createFolds(train_RF$Exome, k = k)
+# Define the values of maxnodes and ntree to test
+maxnodes_values <- c(5, 7, 10)
+ntree_values <- c(500, 1000, 1500)
 
-# Loop over each fold of cross-validation
-for (i in 1:k) {
-  
-  # Split hte data intro training and validation sets for this fold
-  train_indices <- unlist(folds[-i])
-  valid_indices <- folds[[i]]
-  train_cv <- train_RF[train_indices, ]
-  valid_cv <- train_RF[valid_indices, ]
-  
-  # Train random forest model on the training set
-  rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
-                           proximity = TRUE, ntree = 1000)
-  
-  # Make predictions on the validation set using the trained model
-  rf_pred <- predict(rf_model, newdata = valid_cv)
-  
-  # Calculate the confusion matrix and accuracy score for this fold
-  confusion_matrix <- table(valid_cv$Exome, rf_pred)
-  accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
-  cv_accuracies[i] <- accuracy
+# Loop over each combination of hyperparameters
+for (maxnodes in maxnodes_values) {
+  for (ntree in ntree_values) {
+    
+    # Create k folds for cross-validation
+    folds <- createFolds(train_RF$Exome, k = k)
+    
+    # Loop over each fold of cross-validation
+    for (i in 1:k) {
+      
+      # Split the data into training and validation sets for this fold
+      train_indices <- unlist(folds[-i])
+      valid_indices <- folds[[i]]
+      train_cv <- train_RF[train_indices, ]
+      valid_cv <- train_RF[valid_indices, ]
+      
+      # Train random forest model on the training set
+      rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
+                               proximity = TRUE, ntree = ntree, maxnodes = maxnodes)
+      
+      # Make predictions on the validation set using the trained model
+      rf_pred <- predict(rf_model, newdata = valid_cv)
+      
+      # Calculate the confusion matrix and accuracy score for this fold
+      confusion_matrix <- table(valid_cv$Exome, rf_pred)
+      accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
+      cv_accuracies[i] <- accuracy
+    }
+    
+    # Calculate the mean and standard deviation of the accuracy scores over all folds 
+    # of cross-validation
+    mean_accuracy <- mean(cv_accuracies)
+    sd_accuracy <- sd(cv_accuracies)
+    
+    # Train a random forest model
+    rf_model <- randomForest(Exome ~ ., data = train_RF, importance = TRUE, 
+                             proximity = TRUE, ntree = ntree, maxnodes = maxnodes)
+    
+    # Make predictions on the test set using the trained model
+    rf_pred <- predict(rf_model, newdata = test_RF)
+    
+    # Calculate the confusion matrix and accuracy of the predictions
+    confusion_matrix <- table(test_RF$Exome, rf_pred)
+    accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
+    
+    # Print the confusion matrix and accuracy on the test set, as well as the hyperparameters used
+    cat("\nMaxnodes:", maxnodes, "NTree:", ntree)
+    cat("\nConfusion Matrix:\n")
+    print(confusion_matrix)
+    cat("\nAccuracy on Test Set:", accuracy)
+    
+    # Print the mean accuracy and standard deviation over k folds
+    cat("\nMean Accuracy over", k, "Folds:", mean_accuracy)
+    cat("\nStandard Deviation of Accuracies over", k, "Folds:", sd_accuracy)
+  }
 }
 
-# Calculate the mean and standard deviation of the accuracy scores over all folds 
-# of cross-validation
-mean_accuracy <- mean(cv_accuracies)
-sd_accuracy <- sd(cv_accuracies)
 
 # Train a random forest model
 rf_model <- randomForest(Exome ~ ., data = train_RF, importance = TRUE, 
@@ -256,10 +288,6 @@ accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
 cat("Confusion Matrix:\n")
 print(confusion_matrix)
 cat("\nAccuracy on Test Set:", accuracy)
-
-# Print the mean accuracy and standar deviation over k folds
-cat("\nMean Accuracy over", k, "Folds:", mean_accuracy)
-cat("\nStandard Deviation of Accuracies over", k, "Folds:", sd_accuracy)
 
 # Calculate and print the variable importance of the model
 var_imp <- randomForest::importance(rf_model)
