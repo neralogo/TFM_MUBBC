@@ -50,7 +50,8 @@ write.table(data_df_NA, "Exoma_HGUGM_NA.bed", sep = "\t", quote = FALSE,
 
 # Use bedtools to find the intersection of the input BED file with a gene 
 # annotation file
-system("bedtools intersect -a Exoma_HGUGM_NA.bed -b GENE_BBDD.bed > intersect.bed")
+system("bedtools intersect -a Exoma_HGUGM_NA.bed -b GENE_BBDD.bed > 
+       intersect.bed")
 
 # Read in the intersection file as a character vector
 text <- readLines("intersect.bed")
@@ -87,8 +88,10 @@ rm(data_df)
 
 # Replace "|" with "," in GATK.samples column
 # Replace "_" with "-" in GATK.samples column
-data_df_ASD_genes$GATK.samples <- gsub("\\|", ",", data_df_ASD_genes$GATK.samples)
-data_df_ASD_genes$GATK.samples <- gsub("_", "-", data_df_ASD_genes$GATK.samples)
+data_df_ASD_genes$GATK.samples <- gsub("\\|", ",", 
+                                       data_df_ASD_genes$GATK.samples)
+data_df_ASD_genes$GATK.samples <- gsub("_", "-", 
+                                       data_df_ASD_genes$GATK.samples)
 
 # Split comma-separated values in GATK.samples into separate rows
 # If an ID doesn't start with "G01-GEA-", add it to the beginning
@@ -153,8 +156,8 @@ for (i in 1:nrow(data_df_ASD_genes)) {
   
   for (j in 1:length(ids)) {
     
-    # If the ID starts with "G01-GEA-" and does not contain "-HI", "-MA", or "-PA"
-    # then keep only the first 14 characters
+    # If the ID starts with "G01-GEA-" and does not contain "-HI", "-MA", or 
+    # "-PA" then keep only the first 14 characters
     if (grepl("^G01-GEA-\\d+", ids[j]) && !grepl("-HI|-MA|-PA", ids[j])) {
       ids[j] <- substr(ids[j], start = 1, stop = 14)
       
@@ -172,7 +175,7 @@ for (i in 1:nrow(data_df_ASD_genes)) {
 
 ############################CREATE TRIO FILES##################################
 
-# Get unique substrings from the Padded_IDs column of the data_df_test data frame
+# Get unique substrings from the Padded_IDs column of the data_df_test dataframe
 unique_ids <- unique(str_extract(data_df_ASD_genes$Padded_IDs, "^G01-GEA-\\d+"))
 
 # Create a new directory called "Split"
@@ -258,7 +261,8 @@ for (subdir in subdir_list) {
 
 #············Filtering Homozygous and Heterozygous pathogenic variants··········
 
-filter_variants <- function(subdir_list, maxpopfreq, inheritance, gatkcounts, annotation, filename_hom_het) {
+filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL, 
+                      gatkcounts = NULL, annotation = NULL, filename_hom_het) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
@@ -272,25 +276,35 @@ filter_variants <- function(subdir_list, maxpopfreq, inheritance, gatkcounts, an
       # Read in the CSV file as a data frame
       df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
       
-      # Filter variants
+      # Filters the data frame to remove any variants with a maximum population 
+      # frequency greater than the input value (if provided).
       if (!is.null(maxpopfreq)) {
         df <- subset(df, MaxPopFreq < hom_maxpopfreq)
       }
       
+      # Filters the data frame to remove any variants with an inheritance 
+      # pattern matching the input regular expression (if provided).
       if (!is.null(inheritance)) {
         df <- df[!grepl(hom_inheritance, df$CGD_Inheritance), ]
       }
       
+      # Filters the data frame to remove any variants with a GATK count greater 
+      # than the input value (if provided).
       if (!is.null(gatkcounts)) {
         df <- df[gsub("\\..*$", "", df$GATK.counts) < hom_gatkcounts, ]
       }
       
+      # Filters the data frame to remove any variants with an annotation 
+      # matching the input regular expression (if provided).
       if (!is.null(annotation)) {
         df <- df[!grepl(hom_annotation, df$Annotation.RefSeq), ]
       }
       
-      # Create a new file with the filtered data frame
-      filename <- paste0(subdir, "/", "filtered_", filename_hom_het, "_", basename(file))
+      # Creates a new file with the filtered data and writes it to disk. The 
+      # new file is saved with a name based on the original file name and the 
+      # input parameters.
+      filename <- paste0(subdir, "/", "filtered_", filename_hom_het, "_", 
+                         basename(file))
       write.csv(df, file = filename, row.names = FALSE)
     }
   }
