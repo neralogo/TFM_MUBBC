@@ -5,71 +5,93 @@ library(stringr)
 
 #####################GENE SELECTION########################################
 
-
-# Reads the content of the file "ASC_Spain.PASS.annotated.txt" into a character
-# vector "text", where each line of the file becomes an element of the vector
+# Read in file as character vector
 text <- readLines("home/nodotea/NERA/Exomas_HGUGM_autismo/")
 
-# Calculates the maximum number of columns in the tab-separated values file by 
-# splitting each line of the file by tabs and finding the maximum number of 
-# resulting elements
+# Determine the maximum number of columns in the text data
 max_cols <- max(sapply(strsplit(text, "\t"), length))
 
-# Creates an empty matrix with the same number of rows as "text" and the same 
-# number of columns as "max_cols"
+# Create an empty matrix with the correct dimensions
 data_matrix <- matrix(nrow = length(text), ncol = max_cols)
 
-# Loops through each element of "text" and splits it by tabs to create a vector 
-# "line". The values of "line" are then assigned to the corresponding row of 
-# "data_matrix"
+# Fill the matrix with data from the text file
 for (i in 1:length(text)) {
   line <- strsplit(text[i], "\t")[[1]]
-  data_matrix[i, 1:length(line)] <- line}
+  data_matrix[i, 1:length(line)] <- line
+}
 
-# Assigns the values of the first row of "data_matrix" as column names of the 
-# matrix. The first row is then removed from "data_matrix", and the matrix is 
-# converted to a data frame. Finally, the matrix is removed from the environment.
+# Assign column names to the matrix using the first row
 colnames(data_matrix) <- data_matrix[1, ]
+
+# Remove the first row of the matrix (since it contains column names)
 data_matrix <- data_matrix[-1,]
+
+# Convert the matrix to a data frame
 data_df <- as.data.frame(data_matrix)
+
+# Remove the matrix to save memory
 rm(data_matrix)
 
+# Replace empty values and NAs with "NA" in the data frame
+data_df_NA <- data.frame(lapply(data_df, function(x) ifelse(is.na(x) | x == "",
+                                                            "NA", x)))
 
-data_df_NA <- data.frame(lapply(data_df, function(x) ifelse(is.na(x) | x == "", "NA", x)))
+# Prepend "chr" to the chromosome column
 data_df_NA$Chr <- paste0("chr", data_df_NA$Chr)
+
+# Convert start positions to numeric values and subtract 1 (bedtools requires 
+# 0-based start positions)
 data_df_NA$Start <- as.numeric(data_df_NA$Start)
 data_df_NA$Start <- data_df_NA$Start - 1
 
+# Write the modified data frame to a file in BED format
+write.table(data_df_NA, "Exoma_HGUGM_NA.bed", sep = "\t", quote = FALSE, 
+            row.names = FALSE, col.names = FALSE)
 
-write.table(data_df_NA, "Exoma_HGUGM_NA.bed", sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-
-
+# Use bedtools to find the intersection of the input BED file with a gene 
+# annotation file
 system("bedtools intersect -a Exoma_HGUGM_NA.bed -b GENE_BBDD.bed > intersect.bed")
 
+# Read in the intersection file as a character vector
 text <- readLines("intersect.bed")
+
+# Determine the maximum number of columns in the text data
 max_cols <- max(sapply(strsplit(text, "\t"), length))
+
+# Create an empty matrix with the correct dimensions
 data_matrix <- matrix(nrow = length(text), ncol = max_cols)
+
+# Fill the matrix with data from the text file
 for (i in 1:length(text)) {
   line <- strsplit(text[i], "\t")[[1]]
-  data_matrix[i, 1:length(line)] <- line}
+  data_matrix[i, 1:length(line)] <- line
+}
+
+# Assign column names to the matrix using the original data frame
 colnames(data_matrix) <- colnames(data_df)
+
+# Remove the first row of the matrix (since it contains column names)
 data_matrix <- data_matrix[-1,]
+
+# Convert the matrix to a data frame
 data_df_ASD_genes <- as.data.frame(data_matrix)
+
+# Remove the matrix to save memory
 rm(data_matrix)
+
+# Remove the original data frame to save memory
 rm(data_df)
 
 
 #####################DATA PREPROCESSING########################################
 
-
-# Replaces the "|" character with "," in the "GATK.samples" column of "data_df_test"
-# and splits each element of the column by "," to create a list.
+# Replace "|" with "," in GATK.samples column
+# Replace "_" with "-" in GATK.samples column
 data_df_ASD_genes$GATK.samples <- gsub("\\|", ",", data_df_ASD_genes$GATK.samples)
 data_df_ASD_genes$GATK.samples <- gsub("_", "-", data_df_ASD_genes$GATK.samples)
 
-#Loops through each line and each ID of the row, checks whether the ID already
-#contains the substring "G01-GEA-"; if not it replaces "GEA" with "G01-GEA-".
-#Finally, it will join the modified IDs back together and collapse them with a comma.
+# Split comma-separated values in GATK.samples into separate rows
+# If an ID doesn't start with "G01-GEA-", add it to the beginning
 data_df_ASD_genes <- data_df_ASD_genes %>%
   mutate(GATK.samples = strsplit(as.character(GATK.samples), ",")) %>%
   mutate(GATK.samples = lapply(GATK.samples, function(ids) {
@@ -84,70 +106,71 @@ data_df_ASD_genes <- data_df_ASD_genes %>%
     paste(ids, collapse = ",")
   }))
 
-# Define function to add hyphen after the number in the ID
+# Add hyphen between numbers and letters in GATK.samples column
 add_hyphen <- function(x) {
   str_replace_all(x, "(\\d+)([A-Z]+)", "\\1-\\2")
 }
 
-# Homogenize the sample names
+# Pad the GATK samples column with spaces to ensure consistent length.
+# Split the GATK samples column by comma into a list.
+# Apply the add_hyphen function to add hyphens between the numbers and letters 
+# in each sample ID.
+# Join the list back into a comma-separated string for each row.
 data_df_ASD_genes <- data_df_ASD_genes %>%
-  mutate(GATK.samples = str_pad(GATK.samples, width = 15, side = "right", pad = " ")) %>%
+  mutate(GATK.samples = str_pad(GATK.samples, width = 15, side = "right", 
+                                pad = " ")) %>%
   mutate(GATK.samples = str_split(GATK.samples, ",")) %>%
   mutate(GATK.samples = lapply(GATK.samples, add_hyphen)) %>%
-  mutate(GATK.samples = sapply(GATK.samples, function(x) paste(x, collapse = ","))) 
+  mutate(GATK.samples = sapply(GATK.samples, function(x) paste(x, 
+                                                               collapse = ","))) 
 
-# Split the sample IDs into separate columns
+# Create a matrix of padded IDs from GATK.samples column
+# Pad IDs with leading zeros if needed
 sample_cols <- strsplit(data_df_ASD_genes$GATK.samples, ",")
 max_cols <- max(lengths(sample_cols))
 sample_df <- matrix("", nrow = max_cols, ncol = length(sample_cols))
 
 for (i in seq_along(sample_cols)) {
-  # pad the numeric part of each ID
-  padded_ids <- gsub("(?<=-)(\\d)(?=-|$)", "00\\1", sample_cols[[i]], perl = TRUE)
+  padded_ids <- gsub("(?<=-)(\\d)(?=-|$)", "00\\1", sample_cols[[i]], 
+                     perl = TRUE)
   padded_ids <- gsub("(?<=-)(\\d{2})(?=-|$)", "0\\1", padded_ids, perl = TRUE)
   
-  # assign padded IDs to the matrix
   sample_df[1:length(padded_ids), i] <- padded_ids
 }
 
-# combine the padded IDs back into a single column
+# Combine padded IDs into a comma-separated string
 data_df_ASD_genes$Padded_IDs <- apply(sample_df, 2, paste0, collapse = ",")
 
-
+# Remove any consecutive commas or trailing commas
 data_df_ASD_genes$Padded_IDs <- gsub(",+", ",", data_df_ASD_genes$Padded_IDs)
 data_df_ASD_genes$Padded_IDs <- gsub("[:,]+$", "", data_df_ASD_genes$Padded_IDs)
 
-
-
-# Loop through the IDs column of data_df
+# Loop through each row in the dataframe 
 for (i in 1:nrow(data_df_ASD_genes)) {
   
-  # Split IDs into a vector by ";"
+  # Split the Padded_IDs string into individual IDs and loop through each one
   ids <- unlist(strsplit(as.character(data_df_ASD_genes$Padded_IDs[i]), ","))
   
-  # Loop through the vector of IDs
   for (j in 1:length(ids)) {
     
-    # Check if ID is missing "-HI", "-MA" or "-PA" substring
+    # If the ID starts with "G01-GEA-" and does not contain "-HI", "-MA", or "-PA"
+    # then keep only the first 14 characters
     if (grepl("^G01-GEA-\\d+", ids[j]) && !grepl("-HI|-MA|-PA", ids[j])) {
-      
-      # Keep only the first 14 characters of the ID
       ids[j] <- substr(ids[j], start = 1, stop = 14)
       
+      # If the ID starts with "G01-GEA-" and contains "-HI", "-MA", or "-PA"
+      # then keep only the first 14 characters
     } else if (grepl("^G01-GEA-\\d+", ids[j]) && grepl("-HI|-MA|-PA", ids[j])) {
       
-      # Remove everything after "-HI", "-MA" or "-PA"
       ids[j] <- substr(ids[j], start = 1, stop = 14)
     }
   }
-  
-  # Combine modified IDs into a single string separated by ";"
+  # Update the Padded_IDs column with the modified IDs
   data_df_ASD_genes$Padded_IDs[i] <- paste(ids, collapse = ",")
 }
 
 
-
-###############################################################################
+############################CREATE TRIO FILES##################################
 
 # Get unique substrings from the Padded_IDs column of the data_df_test data frame
 unique_ids <- unique(str_extract(data_df_ASD_genes$Padded_IDs, "^G01-GEA-\\d+"))
@@ -189,9 +212,11 @@ for (subdir in subdir_list) {
   # Loop through the file list and apply the function to each file
   for (file in file_list) {
     # Read in the CSV file as a data frame
-    df <- read.csv(paste0(subdir, "/", file), header = TRUE, stringsAsFactors = FALSE)
+    df <- read.csv(paste0(subdir, "/", file), header = TRUE, 
+                   stringsAsFactors = FALSE)
     
-    # Remove rows that don't contain the ID substring + "-HI" in the Padded_IDs column
+    # Remove rows that don't contain the ID substring + "-HI" in the Padded_IDs 
+    # column
     df <- remove_non_HI_rows(df, id)
     
     # Create a new file with the modified data frame
@@ -200,9 +225,9 @@ for (subdir in subdir_list) {
 }
 
 
-
 #####################VARIANT FILTERING########################################
-        # FILTERING CLINVAR PATHOGENIC VARIANTS
+
+#··················Filtering CLINVAR pathogenic variants······················
 
 # Get a list of all subdirectories (i.e., unique IDs) in the directory
 subdir_list <- list.dirs(dir_path, recursive = FALSE)
@@ -211,7 +236,8 @@ subdir_list <- list.dirs(dir_path, recursive = FALSE)
 for (subdir in subdir_list) {
   
   # Get a list of all "HI_only_" files in the subdirectory
-  file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_only_", full.names = TRUE)
+  file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_only_", 
+                          full.names = TRUE)
   
   # Loop through each "HI_only_" file in the subdirectory and apply the function
   for (file in file_list) {
@@ -230,46 +256,48 @@ for (subdir in subdir_list) {
   }
 }
 
-      # FILTERING HOMOZYGOUS
+#············Filtering Homozygous and Heterozygous pathogenic variants··········
 
-# Loop through each subdirectory
-for (subdir in subdir_list) {
+filter_variants <- function(subdir_list, maxpopfreq, inheritance, gatkcounts, annotation, filename_hom_het) {
   
-  # Get a list of all "HI_only_" files in the subdirectory
-  file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_only_", full.names = TRUE)
-  
-  # Loop through each "HI_only_" file in the subdirectory and filter homozygous variants
-  for (file in file_list) {
-    # Read in the CSV file as a data frame
-    df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
+  # Loop through each subdirectory
+  for (subdir in subdir_list) {
     
-    # Filter rows that have MaxPopFreq smaller than 0.05
-    df <- subset(df, MaxPopFreq < 0.05)
+    # Get a list of all "HI_only_" files in the subdirectory
+    file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_only_", 
+                            full.names = TRUE)
     
-    # Filter rows that do not have "AD" in the CGD_Inheritance column
-    df <- df[!grepl("\\bAD\\b", df$CGD_Inheritance), ]
-    
-    # Filter rows that have a GATK.counts value smaller than 50
-    df <- df[gsub("\\..*$", "", df$GATK.counts) < 50, ]
-    
-    # Filter rows that do not have "synonymous" in the Annotation.RefSeq column
-    df <- df[!grepl("\\bsynonymous\\b", df$Annotation.RefSeq), ]
-    
-    # Create a new file with the filtered data frame
-    filename <- paste0(subdir, "/", "HI_only_homozygous_", basename(file))
-    write.csv(df, file = filename, row.names = FALSE)
+    # Loop through each "HI_only_" file in the subdirectory and filter variants
+    for (file in file_list) {
+      # Read in the CSV file as a data frame
+      df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
+      
+      # Filter variants
+      if (!is.null(maxpopfreq)) {
+        df <- subset(df, MaxPopFreq < hom_maxpopfreq)
+      }
+      
+      if (!is.null(inheritance)) {
+        df <- df[!grepl(hom_inheritance, df$CGD_Inheritance), ]
+      }
+      
+      if (!is.null(gatkcounts)) {
+        df <- df[gsub("\\..*$", "", df$GATK.counts) < hom_gatkcounts, ]
+      }
+      
+      if (!is.null(annotation)) {
+        df <- df[!grepl(hom_annotation, df$Annotation.RefSeq), ]
+      }
+      
+      # Create a new file with the filtered data frame
+      filename <- paste0(subdir, "/", "filtered_", filename_hom_het, "_", basename(file))
+      write.csv(df, file = filename, row.names = FALSE)
+    }
   }
 }
 
 
-
-
 #FALTA CADD Y DANN. CADD corte en 15; DANN
 #Mirar si falta añadir OMIM Disorder not empty y CGD category
-
-
-
-        # FILTERING HETEROZYGOUS
-
 
 
