@@ -87,8 +87,8 @@ df_imp <- data.frame(x = dens_imp$x, y = dens_imp$y, type = "Imputed data")
 
 # Plot the density distributions using ggplot
 ggplot(data = data.frame(x = c(dens_orig$x, dens_imp$x), y = c(dens_orig$y, 
-                                                               dens_imp$y), type = rep(c("Original data", "Imputed data"), 
-                                                                                       each = length(dens_orig$x))), aes(x = x, y = y, color = type)) +
+  dens_imp$y), type = rep(c("Original data", "Imputed data"), 
+  each = length(dens_orig$x))), aes(x = x, y = y, color = type)) +
   geom_line(size = 0.5) +
   labs(x = "Age in months", y = "Density distribution", title = "Age walking") +
   scale_color_manual(values = c("blue", "red")) +
@@ -219,7 +219,7 @@ test_RF <- balanced_df[-trainIndex_RF, ]
 
 # Find the best metric value for the 
 bestmtry <- tuneRF(train_RF[,-9], train_RF[,9], mtryStart = 1, ntreeTry = 100, 
-                   improve = 0.05, stepFactor = 3, trace = T, plot = T, doBest = F)
+                   improve = 0.001, stepFactor = 2, trace = T, plot = T, doBest = F)
 
 bestmtry <- which.max(bestmtry)
 
@@ -340,3 +340,5 @@ x2 <- dims[1]+ 0.49*diff(dims[1:2])
 y2 <- dims[3]- 0.009*diff(dims[3:4])
 text(x1,y1,expression(NTree),srt=60)
 text(y2,x2,expression(Accuracy),srt=90)
+
+reprtree:::plot.getTree(rf_model) #no plotea las vv de interés
