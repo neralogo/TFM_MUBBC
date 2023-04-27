@@ -262,7 +262,7 @@ for (subdir in subdir_list) {
 #············Filtering Homozygous and Heterozygous pathogenic variants··········
 
 filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL, 
-                      gatkcounts = NULL, annotation = NULL, filename_hom_het) {
+                            gatkcounts = NULL, annotation = NULL, filename_hom_het, variant_type) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
@@ -275,6 +275,23 @@ filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL,
     for (file in file_list) {
       # Read in the CSV file as a data frame
       df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
+      
+      # Filter for PTV variants
+      if (variant_type == "PTV") {
+        # Remove 3' and 5' variants, downstream, intronic, missense, and synonymous
+        df <- subset(df, !(grepl("3'", df$Annotation.RefSeq) | 
+                             grepl("5'", df$Annotation.RefSeq) | 
+                             grepl("downstream", df$Annotation.RefSeq) |
+                             grepl("intronic", df$Annotation.RefSeq) |
+                             grepl("missense", df$Annotation.RefSeq) |
+                             grepl("synonymous", df$Annotation.RefSeq)))
+      } 
+      
+      # Filter for missense variants
+      if (variant_type == "missense") {
+        # Keep only missense variants
+        df <- subset(df, grepl("missense", df$Annotation.RefSeq))
+      }
       
       # Filters the data frame to remove any variants with a maximum population 
       # frequency greater than the input value (if provided).
@@ -304,11 +321,12 @@ filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL,
       # new file is saved with a name based on the original file name and the 
       # input parameters.
       filename <- paste0(subdir, "/", "filtered_", filename_hom_het, "_", 
-                         basename(file))
+                         variant_type, "_", basename(file))
       write.csv(df, file = filename, row.names = FALSE)
     }
   }
 }
+
 
 
 #FALTA CADD Y DANN. CADD corte en 15; DANN

@@ -13,7 +13,6 @@ library(mltools)    # Provides a set of functions for machine learning tasks
 library(ggtext)     # Provides a set of functions for using formatted text in 
 #ggplot2 graphics
 library(pROC)       # Provides functions for analyzing and visualizing ROC curves
-library(plotly)
 
 
 # Sets the seed for reproducibility
@@ -227,8 +226,8 @@ bestmtry <- which.max(bestmtry)
 k <- 5
 
 # Define the values of maxnodes and ntree to test
-maxnodes_values <- c(3, 5, 7)
-ntree_values <- c(500, 1000, 1500)
+maxnodes_values <- c(3, 4, 5, 6, 7)
+ntree_values <- c(250, 500, 1000, 1500, 2000)
 
 # Initialize matrix to store accuracies for each combination of hyperparameters
 accuracy_matrix <- matrix(nrow=length(maxnodes_values)*length(ntree_values), 
@@ -317,13 +316,6 @@ cat("\n\nConfusion Matrix:")
 print(confusion_matrix)
 
 
-# Calculate and print the variable importance of the model
-var_imp <- randomForest::importance(rf_model)
-var_imp <- var_imp[order(var_imp[,4], decreasing = TRUE), ]
-var_imp <- as.data.frame(var_imp)
-print(var_imp)
-varImpPlot(rf_model)
-
 accuracy_df <- as.data.frame(accuracy_matrix)
 
 
@@ -340,5 +332,15 @@ x2 <- dims[1]+ 0.49*diff(dims[1:2])
 y2 <- dims[3]- 0.009*diff(dims[3:4])
 text(x1,y1,expression(NTree),srt=60)
 text(y2,x2,expression(Accuracy),srt=90)
+
+# Calculate and print the variable importance of the model
+var_imp <- randomForest::importance(rf_model)
+var_imp <- var_imp[order(var_imp[,4], decreasing = TRUE), ]
+var_imp <- as.data.frame(var_imp)
+print(var_imp)
+varImpPlot(rf_model, main = "Variable importance of model")
+
+
+
 
 reprtree:::plot.getTree(rf_model) #no plotea las vv de interés
