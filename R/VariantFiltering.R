@@ -262,7 +262,8 @@ for (subdir in subdir_list) {
 #············Filtering Homozygous and Heterozygous pathogenic variants··········
 
 filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL, 
-                            gatkcounts = NULL, annotation = NULL, filename_hom_het, variant_type) {
+                         gatkcounts = NULL, annotation = NULL, filename_hom_het, 
+                         variant_type) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
