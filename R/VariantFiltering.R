@@ -329,8 +329,5 @@ filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL,
 }
 
 
-
-#FALTA CADD Y DANN. CADD corte en 15; DANN
-#Mirar si falta añadir OMIM Disorder not empty y CGD category
-
+# Filter out the variants whose gene pLI score is lower than 0.9
 
