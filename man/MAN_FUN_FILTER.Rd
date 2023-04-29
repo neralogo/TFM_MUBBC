@@ -31,6 +31,8 @@ filter_variants(subdir_list, variant_type, maxpopfreq = NULL, inheritance = NULL
 }
 
 \examples{
+##---- Should NOT be DIRECTLY executable !! ----
+
 Define input arguments
 subdir_list <- list("./data/subdir1", "./data/subdir2")
 variant_type <- "PTV"
