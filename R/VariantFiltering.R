@@ -6,7 +6,7 @@ library(stringr)
 #####################GENE SELECTION########################################
 
 # Read in file as character vector
-text <- readLines("home/nodotea/NERA/Exomas_HGUGM_autismo/")
+text <- readLines("NERA/Exomas_HGUGM_autismo/Exomas_HGUGM_autismo.tab.gz")
 
 # Determine the maximum number of columns in the text data
 max_cols <- max(sapply(strsplit(text, "\t"), length))
@@ -50,8 +50,7 @@ write.table(data_df_NA, "Exoma_HGUGM_NA.bed", sep = "\t", quote = FALSE,
 
 # Use bedtools to find the intersection of the input BED file with a gene 
 # annotation file
-system("bedtools intersect -a Exoma_HGUGM_NA.bed -b GENE_BBDD.bed > 
-       intersect.bed")
+system("bedtools intersect -a Exoma_HGUGM_NA.bed -b GENE_BBDD.bed > intersect.bed")
 
 # Read in the intersection file as a character vector
 text <- readLines("intersect.bed")
@@ -83,6 +82,8 @@ rm(data_matrix)
 # Remove the original data frame to save memory
 rm(data_df)
 
+# Remove the NA filled dataframe to save memory
+rm(data_df_NA)
 
 #####################DATA PREPROCESSING########################################
 
@@ -148,6 +149,8 @@ data_df_ASD_genes$Padded_IDs <- apply(sample_df, 2, paste0, collapse = ",")
 data_df_ASD_genes$Padded_IDs <- gsub(",+", ",", data_df_ASD_genes$Padded_IDs)
 data_df_ASD_genes$Padded_IDs <- gsub("[:,]+$", "", data_df_ASD_genes$Padded_IDs)
 
+data_df_ASD_genes$Padded_IDs_short <- ""
+
 # Loop through each row in the dataframe 
 for (i in 1:nrow(data_df_ASD_genes)) {
   
@@ -157,9 +160,9 @@ for (i in 1:nrow(data_df_ASD_genes)) {
   for (j in 1:length(ids)) {
     
     # If the ID starts with "G01-GEA-" and does not contain "-HI", "-MA", or 
-    # "-PA" then keep only the first 14 characters
-    if (grepl("^G01-GEA-\\d+", ids[j]) && !grepl("-HI|-MA|-PA", ids[j])) {
-      ids[j] <- substr(ids[j], start = 1, stop = 14)
+    # "-PA" then add "-HI" and keep only the first 14 characters
+    if (grepl("^G01-GEA-\\d{3}", ids[j]) && !grepl("-MA|-PA|-HI", ids[j])) {
+      ids[j] <- paste0(substr(ids[j], start = 1, stop = 11), "-HI")
       
       # If the ID starts with "G01-GEA-" and contains "-HI", "-MA", or "-PA"
       # then keep only the first 14 characters
@@ -169,7 +172,7 @@ for (i in 1:nrow(data_df_ASD_genes)) {
     }
   }
   # Update the Padded_IDs column with the modified IDs
-  data_df_ASD_genes$Padded_IDs[i] <- paste(ids, collapse = ",")
+  data_df_ASD_genes$Padded_IDs_short[i] <- paste(ids, collapse = ", ")
 }
 
 
@@ -200,9 +203,26 @@ for (id in unique_ids) {
 
 
 # Define a function to remove rows that don't contain the ID substring + "-HI"
-remove_non_HI_rows <- function(df, id) {
-  df[grepl(paste0(id, "-HI"), df[, "Padded_IDs"]), ]
+#remove_non_HI_rows <- function(df, id) {
+#  df[grepl(paste0(id, "-HI"), df[, "Padded_IDs"]), ]
+#}
+
+##################seguir aqui##############!!!!!!!!!!!!!!!!!!!!!!!
+
+# Define a function to remove rows that contain the parents ID substring so we 
+# only keep de novo mutations
+keep_de_novo <- function(df, id) {
+  parent_ids <- paste0(id, "-MA|", id, "-PA")
+  keep_rows <- sapply(strsplit(df$Padded_IDs, ","), function(x) {
+    !any(grepl(parent_ids, x))
+  })
+  df[keep_rows, ]
 }
+
+dir_path <- "Split/"
+
+# Get a list of all subdirectories (i.e., unique IDs) in the directory
+subdir_list <- list.dirs(dir_path, recursive = FALSE)
 
 # Loop through each subdirectory
 for (subdir in subdir_list) {
@@ -220,20 +240,18 @@ for (subdir in subdir_list) {
     
     # Remove rows that don't contain the ID substring + "-HI" in the Padded_IDs 
     # column
-    df <- remove_non_HI_rows(df, id)
+    df <- keep_de_novo(df, id)
     
     # Create a new file with the modified data frame
-    write.csv(df, paste0(subdir, "/", "HI_only_", file), row.names = FALSE)
+    write.csv(df, paste0(subdir, "/", "HI_", file), row.names = FALSE)
   }
 }
+
 
 
 #####################VARIANT FILTERING########################################
 
 #··················Filtering CLINVAR pathogenic variants······················
-
-# Get a list of all subdirectories (i.e., unique IDs) in the directory
-subdir_list <- list.dirs(dir_path, recursive = FALSE)
 
 # Loop through each subdirectory
 for (subdir in subdir_list) {
@@ -261,9 +279,9 @@ for (subdir in subdir_list) {
 
 #············Filtering Homozygous and Heterozygous pathogenic variants··········
 
-filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL, 
-                         gatkcounts = NULL, annotation = NULL, filename_hom_het, 
-                         variant_type) {
+filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL, 
+                            inheritance = NULL, gatkcounts = NULL, 
+                            filename_hom_het) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
@@ -312,12 +330,6 @@ filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL,
         df <- df[gsub("\\..*$", "", df$GATK.counts) < hom_gatkcounts, ]
       }
       
-      # Filters the data frame to remove any variants with an annotation 
-      # matching the input regular expression (if provided).
-      if (!is.null(annotation)) {
-        df <- df[!grepl(hom_annotation, df$Annotation.RefSeq), ]
-      }
-      
       # Creates a new file with the filtered data and writes it to disk. The 
       # new file is saved with a name based on the original file name and the 
       # input parameters.
@@ -329,5 +341,25 @@ filter_variants <- function(subdir_list, maxpopfreq = NULL, inheritance = NULL,
 }
 
 
-# Filter out the variants whose gene pLI score is lower than 0.9
+# Homozygote PTV variants
+filter_variants(variant_type = "PTV", maxpopfreq = 0.05, inheritance = "AD",
+                gatkcounts = 50, filename_hom_het = "HOM")
+
+# Homozygote missense variants
+filter_variants(variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
+                gatkcounts = 50, filename_hom_het = "HOM")
+
+# Compound heterozygote missense variants
+#filter_variants(variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
+#               gatkcounts = 50, filename_hom_het = "HOM")
+
+# Heterozygote with AD inheritance missense variants
+filter_variants(variant_type = "PTV", maxpopfreq = 0.01, inheritance = "AR",
+                gatkcounts = 25, filename_hom_het = "HET")
+
+# Heterozygote with AD inheritance missense variants
+filter_variants(variant_type = "missense", maxpopfreq = 0.01, inheritance = "AR",
+                gatkcounts = 25, filename_hom_het = "HOM")
+
+# Filter out the PTV whose gene pLI score is lower than 0.9
 
