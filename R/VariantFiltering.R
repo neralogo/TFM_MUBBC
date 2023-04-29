@@ -207,7 +207,6 @@ for (id in unique_ids) {
 #  df[grepl(paste0(id, "-HI"), df[, "Padded_IDs"]), ]
 #}
 
-##################seguir aqui##############!!!!!!!!!!!!!!!!!!!!!!!
 
 # Define a function to remove rows that contain the parents ID substring so we 
 # only keep de novo mutations
@@ -257,7 +256,7 @@ for (subdir in subdir_list) {
 for (subdir in subdir_list) {
   
   # Get a list of all "HI_only_" files in the subdirectory
-  file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_only_", 
+  file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_", 
                           full.names = TRUE)
   
   # Loop through each "HI_only_" file in the subdirectory and apply the function
@@ -269,7 +268,7 @@ for (subdir in subdir_list) {
     df_pathogenic <- subset(df, ClinVar_Significance == "Pathogenic")
     
     # Create a new file name without the "HI_only_" prefix
-    new_filename <- gsub("^HI_only_", "", basename(file))
+    new_filename <- gsub("^HI_", "", basename(file))
     new_filename <- paste0(subdir, "/", new_filename, "_path_var_clinvar.csv")
     
     # Write a new file with the filtered data frame and the new file name
@@ -279,15 +278,14 @@ for (subdir in subdir_list) {
 
 #············Filtering Homozygous and Heterozygous pathogenic variants··········
 
-filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL, 
-                            inheritance = NULL, gatkcounts = NULL, 
-                            filename_hom_het) {
+filter_variants <- function(subdir_list, variant_type, maxpopfreq, inheritance, 
+                            gatkcounts, filename_hom_het) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
     
     # Get a list of all "HI_only_" files in the subdirectory
-    file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_only_", 
+    file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_", 
                             full.names = TRUE)
     
     # Loop through each "HI_only_" file in the subdirectory and filter variants
@@ -298,10 +296,10 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
       # Filter for PTV variants
       if (variant_type == "PTV") {
         # Remove 3' and 5' variants, downstream, intronic, missense, and synonymous
-        df <- subset(df, !(grepl("3'", df$Annotation.RefSeq) | 
-                             grepl("5'", df$Annotation.RefSeq) | 
+        df <- subset(df, !(grepl("3", df$Annotation.RefSeq) | 
+                             grepl("5", df$Annotation.RefSeq) | 
                              grepl("downstream", df$Annotation.RefSeq) |
-                             grepl("intronic", df$Annotation.RefSeq) |
+                             grepl("intron", df$Annotation.RefSeq) |
                              grepl("missense", df$Annotation.RefSeq) |
                              grepl("synonymous", df$Annotation.RefSeq)))
       } 
@@ -315,19 +313,21 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
       # Filters the data frame to remove any variants with a maximum population 
       # frequency greater than the input value (if provided).
       if (!is.null(maxpopfreq)) {
-        df <- subset(df, MaxPopFreq < hom_maxpopfreq)
+        df <- subset(df, MaxPopFreq < maxpopfreq)
       }
       
       # Filters the data frame to remove any variants with an inheritance 
       # pattern matching the input regular expression (if provided).
       if (!is.null(inheritance)) {
-        df <- df[!grepl(hom_inheritance, df$CGD_Inheritance), ]
+        df <- subset(df, !is.na(CGD_Inheritance) & !grepl(inheritance, CGD_Inheritance))
       }
       
       # Filters the data frame to remove any variants with a GATK count greater 
       # than the input value (if provided).
       if (!is.null(gatkcounts)) {
-        df <- df[gsub("\\..*$", "", df$GATK.counts) < hom_gatkcounts, ]
+        # Convert GATK.counts to numeric and remove decimal part
+        df$GATK.counts <- as.numeric(df$GATK.counts)
+        df <- subset(df, floor(df$GATK.counts) < gatkcounts)
       }
       
       # Creates a new file with the filtered data and writes it to disk. The 
@@ -342,23 +342,23 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
 
 
 # Homozygote PTV variants
-filter_variants(variant_type = "PTV", maxpopfreq = 0.05, inheritance = "AD",
+filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.05, inheritance = "AD",
                 gatkcounts = 50, filename_hom_het = "HOM")
 
 # Homozygote missense variants
-filter_variants(variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
+filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
                 gatkcounts = 50, filename_hom_het = "HOM")
 
 # Compound heterozygote missense variants
 #filter_variants(variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
 #               gatkcounts = 50, filename_hom_het = "HOM")
 
-# Heterozygote with AD inheritance missense variants
-filter_variants(variant_type = "PTV", maxpopfreq = 0.01, inheritance = "AR",
+# Heterozygote with AD inheritance PTV variants
+filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.01, inheritance = "AR",
                 gatkcounts = 25, filename_hom_het = "HET")
 
 # Heterozygote with AD inheritance missense variants
-filter_variants(variant_type = "missense", maxpopfreq = 0.01, inheritance = "AR",
+filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.01, inheritance = "AR",
                 gatkcounts = 25, filename_hom_het = "HOM")
 
 # Filter out the PTV whose gene pLI score is lower than 0.9
