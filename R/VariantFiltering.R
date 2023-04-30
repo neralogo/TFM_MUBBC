@@ -295,7 +295,8 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
       
       # Filter for PTV variants
       if (variant_type == "PTV") {
-        # Remove 3' and 5' variants, downstream, intronic, missense, and synonymous
+        # Remove 3' and 5' variants, downstream, intronic, missense, and 
+        # synonymous
         df <- subset(df, !(grepl("3", df$Annotation.RefSeq) | 
                              grepl("5", df$Annotation.RefSeq) | 
                              grepl("downstream", df$Annotation.RefSeq) |
@@ -330,6 +331,9 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
         df <- subset(df, MPC_score <= MPCscore)
       }
       
+      # Keeps only the rows where OMIM_ID is not NA
+      df <- df[!is.na(df$OMIM_ID),]
+      
       # Creates a new file with the filtered data and writes it to disk. The 
       # new file is saved with a name based on the original file name and the 
       # input parameters.
@@ -341,12 +345,12 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
 }
 
 # De novo PTV variants
-filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.01,
-                gatkcounts = 25, filename_filter = "de_novo")
+filter_variants(subdir_list = subdir_list, variant_type = "PTV", 
+                maxpopfreq = 0.01, gatkcounts = 25, filename_filter = "de_novo")
 
 # De novo missense variants
-filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.01,
-                gatkcounts = 25, MPCscore = 2, filename_filter =  "de_novo")
+filter_variants(subdir_list = subdir_list, variant_type = "missense", 
+maxpopfreq = 0.01, gatkcounts = 25, MPCscore = 2, filename_filter =  "de_novo")
 
 # Read in the data file
 text <- readLines("gnomad.v2.1.1.lof_metrics.by_gene.txt")
@@ -374,11 +378,12 @@ data_pLI_filtered <- subset(data_pLI, pLI >= 0.9)
 # Subset data to only relevant columns and format chromosome column (chr, start,
 # end)
 data_pLI_filtered_intersect <- data_pLI_filtered[,75:77]
-data_pLI_filtered_intersect$chromosome <- paste0("chr", data_pLI_filtered_intersect$chromosome)
+data_pLI_filtered_intersect$chromosome <- paste0("chr", 
+                                        data_pLI_filtered_intersect$chromosome)
 
 # Write intersect file to disk
-write.table(data_pLI_filtered_intersect, "pLI_intersect.bed", sep = "\t", quote = FALSE, 
-            row.names = FALSE, col.names = FALSE)
+write.table(data_pLI_filtered_intersect, "pLI_intersect.bed", sep = "\t", 
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
 
 
 # Define a function to perform intersect for a list of subdirectories
@@ -389,21 +394,22 @@ intersect_func <- function(subdirlist) {
     
     # Find all files in subdirectory with a specific pattern
     file_list <- list.files(paste0(subdir, "/"),
-                            pattern = "^filtered_de_novo_PTV_", full.names = TRUE)
+                          pattern = "^filtered_de_novo_PTV_", full.names = TRUE)
     
     # Loop through each file and perform intersect
     for (file in file_list) {
       
       # Read in the file and write it as a bed file
       df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
-      bed_file <- paste0(subdir, "/", tools::file_path_sans_ext(basename(file)), ".bed")
+      bed_file <- paste0(subdir, "/", tools::file_path_sans_ext(basename(file)), 
+                         ".bed")
       write.table(df, file = bed_file, sep = "\t", quote = FALSE, 
                   col.names = FALSE, row.names = FALSE)
       
       # Perform intersect using bedtools and write output to file
       output_file <- paste0(bed_file, "_intersect.csv")
-      system(paste("bedtools intersect -a", bed_file, "-b ../pLI_intersect.bed -wo >",
-                   output_file))
+      system(paste("bedtools intersect -a", bed_file, 
+                   "-b ../pLI_intersect.bed -wo >", output_file))
     }
   }
 }
