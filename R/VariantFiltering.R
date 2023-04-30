@@ -371,7 +371,8 @@ rm(data_matrix)
 data_pLI$pLI <- as.numeric(data_pLI$pLI)
 data_pLI_filtered <- subset(data_pLI, pLI >= 0.9)
 
-# Subset data to only relevant columns and format chromosome column
+# Subset data to only relevant columns and format chromosome column (chr, start,
+# end)
 data_pLI_filtered_intersect <- data_pLI_filtered[,75:77]
 data_pLI_filtered_intersect$chromosome <- paste0("chr", data_pLI_filtered_intersect$chromosome)
 
