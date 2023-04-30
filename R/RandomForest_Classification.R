@@ -169,8 +169,7 @@ for (method in sampling_methods) {
                                  positive = "Exome"),
     Sensitivity = caret::recall(as.factor(pred_class), test_BD$Exome, 
                                 positive = "Exome"),
-    F1 = caret::F_meas(as.factor(pred_class), test_BD$Exome, positive = "Exome"),
-    MCC = mcc(as.factor(pred_class), test_BD$Exome)
+    F1 = caret::F_meas(as.factor(pred_class), test_BD$Exome, positive = "Exome")
   )
 }
 
@@ -218,7 +217,7 @@ test_RF <- balanced_df[-trainIndex_RF, ]
 
 # Find the best metric value for the 
 bestmtry <- tuneRF(train_RF[,-9], train_RF[,9], mtryStart = 1, ntreeTry = 100, 
-                   improve = 0.001, stepFactor = 2, trace = T, plot = T, doBest = F)
+                   improve = 0.05, stepFactor = 2, trace = T, plot = T, doBest = F)
 
 bestmtry <- which.max(bestmtry)
 
