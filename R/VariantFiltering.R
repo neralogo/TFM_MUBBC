@@ -279,7 +279,8 @@ for (subdir in subdir_list) {
 #············Filtering Homozygous and Heterozygous pathogenic variants··········
 
 filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL, 
-                  inheritance = NULL, gatkcounts = NULL, filename_hom_het) {
+                  inheritance = NULL, gatkcounts = NULL, MPCscore = NULL,
+                  filename_filter) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
@@ -330,36 +331,50 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
         df <- subset(df, floor(df$GATK.counts) < gatkcounts)
       }
       
+      if(!is.null(MPCscore)) {
+        df$MPC
+      }
+      
       # Creates a new file with the filtered data and writes it to disk. The 
       # new file is saved with a name based on the original file name and the 
       # input parameters.
-      filename <- paste0(subdir, "/", "filtered_", filename_hom_het, "_", 
+      filename <- paste0(subdir, "/", "filtered_", filename_filter, "_", 
                          variant_type, "_", basename(file))
       write.csv(df, file = filename, row.names = FALSE)
     }
   }
 }
 
+# Homozygote PTV variants
+filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.05, inheritance = "AD",
+                gatkcounts = 50, filename_filter = "de_novo")
+
+# Homozygote PTV variants
+filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
+                gatkcounts = 50, filename_filter =  "de_novo")
+
+
+
 
 # Homozygote PTV variants
 filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.05, inheritance = "AD",
-                gatkcounts = 50, filename_hom_het = "HOM")
+                gatkcounts = 50, filename_filter =  "HOM")
 
 # Homozygote missense variants
 filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
-                gatkcounts = 50, filename_hom_het = "HOM")
+                gatkcounts = 50, filename_filter = "HOM")
 
 # Compound heterozygote missense variants
 #filter_variants(variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
-#               gatkcounts = 50, filename_hom_het = "HOM")
+#               gatkcounts = 50, filename_filter = "HOM")
 
 # Heterozygote with AD inheritance PTV variants
 filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.01, inheritance = "AR",
-                gatkcounts = 25, filename_hom_het = "HET")
+                gatkcounts = 25, filename_filter = "HET")
 
 # Heterozygote with AD inheritance missense variants
 filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.01, inheritance = "AR",
-                gatkcounts = 25, filename_hom_het = "HOM")
+                gatkcounts = 25, filename_filter = "HOM")
 
 # Filter out the PTV whose gene pLI score is lower than 0.9
 
