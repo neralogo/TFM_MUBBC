@@ -276,7 +276,7 @@ for (subdir in subdir_list) {
   }
 }
 
-#············Filtering Homozygous and Heterozygous pathogenic variants··········
+#···················Filtering de novo pathogenic variants······················
 
 filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL, 
                   gatkcounts = NULL, MPCscore = NULL, filename_filter) {
@@ -348,72 +348,64 @@ filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.
 filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.01,
                 gatkcounts = 25, MPCscore = 2, filename_filter =  "de_novo")
 
-
-
-# Filter out the PTV whose gene pLI score is lower than 0.9
-# Read in file as character vector
+# Read in the data file
 text <- readLines("gnomad.v2.1.1.lof_metrics.by_gene.txt")
 
-# Determine the maximum number of columns in the text data
+# Split the data into a matrix
 max_cols <- max(sapply(strsplit(text, "\t"), length))
-
-# Create an empty matrix with the correct dimensions
 data_matrix <- matrix(nrow = length(text), ncol = max_cols)
 
-# Fill the matrix with data from the text file
+# Fill the matrix with the data
 for (i in 1:length(text)) {
   line <- strsplit(text[i], "\t")[[1]]
   data_matrix[i, 1:length(line)] <- line
 }
 
-# Assign column names to the matrix using the first row
+# Set column names and convert to data frame
 colnames(data_matrix) <- data_matrix[1, ]
-
-# Remove the first row of the matrix (since it contains column names)
 data_matrix <- data_matrix[-1,]
-
-# Convert the matrix to a data frame
 data_pLI <- as.data.frame(data_matrix)
-
-# Remove the matrix to save memory
 rm(data_matrix)
 
+# Convert pLI column to numeric and filter based on pLI value
 data_pLI$pLI <- as.numeric(data_pLI$pLI)
 data_pLI_filtered <- subset(data_pLI, pLI >= 0.9)
+
+# Subset data to only relevant columns and format chromosome column
 data_pLI_filtered_intersect <- data_pLI_filtered[,75:77]
 data_pLI_filtered_intersect$chromosome <- paste0("chr", data_pLI_filtered_intersect$chromosome)
+
+# Write intersect file to disk
 write.table(data_pLI_filtered_intersect, "pLI_intersect.bed", sep = "\t", quote = FALSE, 
             row.names = FALSE, col.names = FALSE)
 
 
+# Define a function to perform intersect for a list of subdirectories
 intersect_func <- function(subdirlist) {
+  
   # Loop through each subdirectory
   for (subdir in subdir_list) {
-    # Get a list of all filtered PTV files in the subdirectory
+    
+    # Find all files in subdirectory with a specific pattern
     file_list <- list.files(paste0(subdir, "/"),
                             pattern = "^filtered_de_novo_PTV_", full.names = TRUE)
     
-    # Loop through each filtered PTV file in the subdirectory
+    # Loop through each file and perform intersect
     for (file in file_list) {
-      # Read in the CSV file as a data frame
-      df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
       
-      # Create a new file with the .bed extension and write the transformed 
-      # data to it
+      # Read in the file and write it as a bed file
+      df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
       bed_file <- paste0(subdir, "/", tools::file_path_sans_ext(basename(file)), ".bed")
       write.table(df, file = bed_file, sep = "\t", quote = FALSE, 
                   col.names = FALSE, row.names = FALSE)
       
-      # Create the output file name
+      # Perform intersect using bedtools and write output to file
       output_file <- paste0(bed_file, "_intersect.csv")
-      
-      # Use bedtools intersect to find overlaps between the bed file and 
-      # pLI_intersect.bed and write the results to a new CSV file
       system(paste("bedtools intersect -a", bed_file, "-b ../pLI_intersect.bed -wo >",
                    output_file))
     }
   }
 }
 
-
+# Call intersect function with a list of subdirectories
 intersect_func(subdirlist = subdir_list)
