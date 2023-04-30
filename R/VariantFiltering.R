@@ -279,13 +279,12 @@ for (subdir in subdir_list) {
 #············Filtering Homozygous and Heterozygous pathogenic variants··········
 
 filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL, 
-                  inheritance = NULL, gatkcounts = NULL, MPCscore = NULL,
-                  filename_filter) {
+                  gatkcounts = NULL, MPCscore = NULL, filename_filter) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
     
-    # Get a list of all "HI_only_" files in the subdirectory
+    # Get a list of all "HI_" files in the subdirectory
     file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_", 
                             full.names = TRUE)
     
@@ -317,12 +316,6 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
         df <- subset(df, MaxPopFreq < maxpopfreq)
       }
       
-      # Filters the data frame to remove any variants with an inheritance 
-      # pattern matching the input regular expression (if provided).
-      if (!is.null(inheritance)) {
-        df <- subset(df, !is.na(CGD_Inheritance) & !grepl(inheritance, CGD_Inheritance))
-      }
-      
       # Filters the data frame to remove any variants with a GATK count greater 
       # than the input value (if provided).
       if (!is.null(gatkcounts)) {
@@ -331,8 +324,10 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
         df <- subset(df, floor(df$GATK.counts) < gatkcounts)
       }
       
+      # Filters the data frame to remove any variants with a MPC score greater
+      # than the input value (if provided).
       if(!is.null(MPCscore)) {
-        df$MPC
+        df <- subset(df, MPC_score <= MPCscore)
       }
       
       # Creates a new file with the filtered data and writes it to disk. The 
@@ -345,36 +340,80 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
   }
 }
 
-# Homozygote PTV variants
-filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.05, inheritance = "AD",
-                gatkcounts = 50, filename_filter = "de_novo")
+# De novo PTV variants
+filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.01,
+                gatkcounts = 25, filename_filter = "de_novo")
 
-# Homozygote PTV variants
-filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
-                gatkcounts = 50, filename_filter =  "de_novo")
-
-
+# De novo missense variants
+filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.01,
+                gatkcounts = 25, MPCscore = 2, filename_filter =  "de_novo")
 
 
-# Homozygote PTV variants
-filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.05, inheritance = "AD",
-                gatkcounts = 50, filename_filter =  "HOM")
-
-# Homozygote missense variants
-filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
-                gatkcounts = 50, filename_filter = "HOM")
-
-# Compound heterozygote missense variants
-#filter_variants(variant_type = "missense", maxpopfreq = 0.05, inheritance = "AD",
-#               gatkcounts = 50, filename_filter = "HOM")
-
-# Heterozygote with AD inheritance PTV variants
-filter_variants(subdir_list = subdir_list, variant_type = "PTV", maxpopfreq = 0.01, inheritance = "AR",
-                gatkcounts = 25, filename_filter = "HET")
-
-# Heterozygote with AD inheritance missense variants
-filter_variants(subdir_list = subdir_list, variant_type = "missense", maxpopfreq = 0.01, inheritance = "AR",
-                gatkcounts = 25, filename_filter = "HOM")
 
 # Filter out the PTV whose gene pLI score is lower than 0.9
+# Read in file as character vector
+text <- readLines("gnomad.v2.1.1.lof_metrics.by_gene.txt")
 
+# Determine the maximum number of columns in the text data
+max_cols <- max(sapply(strsplit(text, "\t"), length))
+
+# Create an empty matrix with the correct dimensions
+data_matrix <- matrix(nrow = length(text), ncol = max_cols)
+
+# Fill the matrix with data from the text file
+for (i in 1:length(text)) {
+  line <- strsplit(text[i], "\t")[[1]]
+  data_matrix[i, 1:length(line)] <- line
+}
+
+# Assign column names to the matrix using the first row
+colnames(data_matrix) <- data_matrix[1, ]
+
+# Remove the first row of the matrix (since it contains column names)
+data_matrix <- data_matrix[-1,]
+
+# Convert the matrix to a data frame
+data_pLI <- as.data.frame(data_matrix)
+
+# Remove the matrix to save memory
+rm(data_matrix)
+
+data_pLI$pLI <- as.numeric(data_pLI$pLI)
+data_pLI_filtered <- subset(data_pLI, pLI >= 0.9)
+data_pLI_filtered_intersect <- data_pLI_filtered[,75:77]
+data_pLI_filtered_intersect$chromosome <- paste0("chr", data_pLI_filtered_intersect$chromosome)
+write.table(data_pLI_filtered_intersect, "pLI_intersect.bed", sep = "\t", quote = FALSE, 
+            row.names = FALSE, col.names = FALSE)
+
+
+intersect_func <- function(subdirlist) {
+  # Loop through each subdirectory
+  for (subdir in subdir_list) {
+    # Get a list of all filtered PTV files in the subdirectory
+    file_list <- list.files(paste0(subdir, "/"),
+                            pattern = "^filtered_de_novo_PTV_", full.names = TRUE)
+    
+    # Loop through each filtered PTV file in the subdirectory
+    for (file in file_list) {
+      # Read in the CSV file as a data frame
+      df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
+      
+      # Create a new file with the .bed extension and write the transformed 
+      # data to it
+      bed_file <- paste0(subdir, "/", tools::file_path_sans_ext(basename(file)), ".bed")
+      write.table(df, file = bed_file, sep = "\t", quote = FALSE, 
+                  col.names = FALSE, row.names = FALSE)
+      
+      # Create the output file name
+      output_file <- paste0(bed_file, "_intersect.csv")
+      
+      # Use bedtools intersect to find overlaps between the bed file and 
+      # pLI_intersect.bed and write the results to a new CSV file
+      system(paste("bedtools intersect -a", bed_file, "-b ../pLI_intersect.bed -wo >",
+                   output_file))
+    }
+  }
+}
+
+
+intersect_func(subdirlist = subdir_list)
