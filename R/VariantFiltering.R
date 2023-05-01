@@ -202,12 +202,6 @@ for (id in unique_ids) {
 }
 
 
-# Define a function to remove rows that don't contain the ID substring + "-HI"
-#remove_non_HI_rows <- function(df, id) {
-#  df[grepl(paste0(id, "-HI"), df[, "Padded_IDs"]), ]
-#}
-
-
 # Define a function to remove rows that contain the parents ID substring so we 
 # only keep de novo mutations
 keep_de_novo <- function(df, id) {
