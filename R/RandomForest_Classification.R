@@ -13,17 +13,17 @@ library(mltools)    # Provides a set of functions for machine learning tasks
 library(ggtext)     # Provides a set of functions for using formatted text in 
 #ggplot2 graphics
 library(pROC)       # Provides functions for analyzing and visualizing ROC curves
-
+library(plot3D)
 
 # Sets the seed for reproducibility
-set.seed(677)
+set.seed(123)
 
 
 ############################### DATA LOADING ###################################
 
 # Set working directory and read in data from CSV file
 setwd("C:/Users/Nera/Desktop/TFM_MUBBC_UAM")
-df <- read.csv("BBDD_ASC_CLASIFICACION.csv", sep = ";", header = TRUE)
+df <- read.csv("ASC_CLASIFICACION.csv", sep = ";", header = TRUE)
 
 
 ############################ DATA PREPROCESSING ################################
@@ -52,8 +52,15 @@ df_no_ID <- df_no_ID[complete.cases(df_no_ID[, c("Age_F_Birth", "Age_symptoms")]
 table(df_no_ID$Exome)
 my_colors <- c("#600000", "#004400")
 freq_table <- table(df_no_ID$Exome)
-barplot(freq_table, main = "Proportion", xlab = "Exome", ylab = "Frequency",
-        col = my_colors)
+barplot(freq_table, 
+        xlab = "Exome", 
+        ylab = "Frequency", 
+        col = my_colors, 
+        main = "")
+title(main = c("Proportion positive /", "negative cases"), 
+      line = 1, 
+      cex.main = 1.3)
+
 
 # Calculate rows with missing values in specific columns
 mean(is.na(df_no_ID$Age_walking)) * 100
@@ -86,8 +93,8 @@ df_imp <- data.frame(x = dens_imp$x, y = dens_imp$y, type = "Imputed data")
 
 # Plot the density distributions using ggplot
 ggplot(data = data.frame(x = c(dens_orig$x, dens_imp$x), y = c(dens_orig$y, 
-  dens_imp$y), type = rep(c("Original data", "Imputed data"), 
-  each = length(dens_orig$x))), aes(x = x, y = y, color = type)) +
+                                                               dens_imp$y), type = rep(c("Original data", "Imputed data"), 
+                                                                                       each = length(dens_orig$x))), aes(x = x, y = y, color = type)) +
   geom_line(size = 0.5) +
   labs(x = "Age in months", y = "Density distribution", title = "Age walking") +
   scale_color_manual(values = c("blue", "red")) +
@@ -100,8 +107,8 @@ ggplot(data = data.frame(x = c(dens_orig$x, dens_imp$x), y = c(dens_orig$y,
 
 # Create training and testing partitions to evaluate the balancing models
 trainIndex_BALANCE <- createDataPartition(imputed_data$Exome, p = 0.7, list = FALSE)
-train_BD <- imputed_data[trainIndex_BALANCE, ]
-test_BD <- imputed_data[-trainIndex_BALANCE, ]
+train_balance <- imputed_data[trainIndex_BALANCE, ]
+test_balance <- imputed_data[-trainIndex_BALANCE, ]
 
 # Set up the train control parameters
 ctrl <- trainControl(method = "cv", number = 5, summaryFunction = twoClassSummary, 
@@ -118,26 +125,26 @@ for (method in sampling_methods) {
   
   # Use the "none" method as the baseline (no method)
   if (method == "none") {
-    model <- caret::train(Exome ~ ., data = train_BD, method = "rf", 
+    model <- caret::train(Exome ~ ., data = train_balance, method = "rf", 
                           trControl = ctrl, importance = TRUE)
   } 
   # Use the undersampling method to balance the classes
   else if (method == "down") {
-    train_balanced <- caret::downSample(x = train_BD[, -9], y = train_BD$Exome, 
+    train_balanced <- caret::downSample(x = train_balance[, -9], y = train_balance$Exome, 
                                         yname = "Exome")
     model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
                           trControl = ctrl, importance = TRUE)
   } 
   # Use the oversampling method to balance the classes
   else if (method == "over") {
-    train_balanced <- caret::upSample(x = train_BD[, -9], y = train_BD$Exome, 
+    train_balanced <- caret::upSample(x = train_balance[, -9], y = train_balance$Exome, 
                                       yname = "Exome")
     model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
                           trControl = ctrl, importance = TRUE)
   } 
   # Use the SMOTE-NC method to balance the classes 
   else if (method == "smotenc") {
-    train_balanced <- smotenc(train_BD, var = "Exome", k = 5, over_ratio = 1)
+    train_balanced <- smotenc(train_balance, var = "Exome", k = 5, over_ratio = 1)
     model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
                           trControl = ctrl, importance = TRUE)
   }
@@ -156,7 +163,7 @@ for (method in sampling_methods) {
   model <- results[[method]]
   
   # Generate predicted probabilites for the test data
-  pred_prob <- predict(model, newdata = test_BD, type = "prob")[, 2]
+  pred_prob <- predict(model, newdata = test_balance, type = "prob")[, 2]
   
   # Convertt predicted probabilites to predicted class levels (Positive or Negative)
   pred_class <- ifelse(pred_prob > 0.5, "Positive", "Negative")
@@ -164,12 +171,12 @@ for (method in sampling_methods) {
   # Store the evaluation metrics for the current sampling method in a dataframe
   evaluations[[method]] <- data.frame(
     Method = method,
-    ROC = roc(test_BD$Exome, pred_prob)$auc,
-    Precision = caret::precision(as.factor(pred_class), test_BD$Exome, 
+    ROC = roc(test_balance$Exome, pred_prob)$auc,
+    Precision = caret::precision(as.factor(pred_class), test_balance$Exome, 
                                  positive = "Exome"),
-    Sensitivity = caret::recall(as.factor(pred_class), test_BD$Exome, 
+    Sensitivity = caret::recall(as.factor(pred_class), test_balance$Exome, 
                                 positive = "Exome"),
-    F1 = caret::F_meas(as.factor(pred_class), test_BD$Exome, positive = "Exome")
+    F1 = caret::F_meas(as.factor(pred_class), test_balance$Exome, positive = "Exome")
   )
 }
 
@@ -217,7 +224,7 @@ test_RF <- balanced_df[-trainIndex_RF, ]
 
 # Find the best metric value for the 
 bestmtry <- tuneRF(train_RF[,-9], train_RF[,9], mtryStart = 1, ntreeTry = 100, 
-                   improve = 0.05, stepFactor = 2, trace = T, plot = T, doBest = F)
+                   improve = 0.01, stepFactor = 2, trace = T, plot = T, doBest = F)
 
 bestmtry <- which.max(bestmtry)
 
@@ -255,8 +262,7 @@ for (maxnodes in maxnodes_values) {
       
       # Train random forest model on the training set
       rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
-                               proximity = TRUE, ntree = ntree, maxnodes = maxnodes,
-                               mtry = bestmtry)
+                               ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
       
       # Make predictions on the validation set using the trained model
       rf_pred <- predict(rf_model, newdata = valid_cv)
@@ -295,7 +301,7 @@ best_ntree <- accuracy_matrix[best_row, 2]
 
 # Train random forest model on the full training set using the best hyperparameters
 rf_model <- randomForest(Exome ~ ., data = train_RF, importance = TRUE, 
-                         proximity = TRUE, ntree = best_ntree, maxnodes = best_maxnodes,
+                         ntree = best_ntree, maxnodes = best_maxnodes,
                          mtry = bestmtry)
 
 # Make predictions on the test set using the trained model
@@ -338,8 +344,3 @@ var_imp <- var_imp[order(var_imp[,4], decreasing = TRUE), ]
 var_imp <- as.data.frame(var_imp)
 print(var_imp)
 varImpPlot(rf_model, main = "Variable importance of model")
-
-
-
-
-reprtree:::plot.getTree(rf_model) #no plotea las vv de interés
