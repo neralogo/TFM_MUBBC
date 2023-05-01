@@ -6,7 +6,7 @@ library(stringr)
 #####################GENE SELECTION########################################
 
 # Read in file as character vector
-text <- readLines("NERA/Exomas_HGUGM_autismo/Exomas_HGUGM_autismo.tab.gz")
+text <- readLines("Exomas_HGUGM_autismo/Exomas_HGUGM_autismo.tab.gz")
 
 # Determine the maximum number of columns in the text data
 max_cols <- max(sapply(strsplit(text, "\t"), length))
@@ -27,25 +27,25 @@ colnames(data_matrix) <- data_matrix[1, ]
 data_matrix <- data_matrix[-1,]
 
 # Convert the matrix to a data frame
-data_df <- as.data.frame(data_matrix)
+data_HGUGM <- as.data.frame(data_matrix)
 
 # Remove the matrix to save memory
 rm(data_matrix)
 
 # Replace empty values and NAs with "NA" in the data frame
-data_df_NA <- data.frame(lapply(data_df, function(x) ifelse(is.na(x) | x == "",
+data_HGUGM_NA <- data.frame(lapply(data_HGUGM, function(x) ifelse(is.na(x) | x == "",
                                                             "NA", x)))
 
 # Prepend "chr" to the chromosome column
-data_df_NA$Chr <- paste0("chr", data_df_NA$Chr)
+data_HGUGM_NA$Chr <- paste0("chr", data_HGUGM_NA$Chr)
 
 # Convert start positions to numeric values and subtract 1 (bedtools requires 
 # 0-based start positions)
-data_df_NA$Start <- as.numeric(data_df_NA$Start)
-data_df_NA$Start <- data_df_NA$Start - 1
+data_HGUGM_NA$Start <- as.numeric(data_HGUGM_NA$Start)
+data_HGUGM_NA$Start <- data_HGUGM_NA$Start - 1
 
 # Write the modified data frame to a file in BED format
-write.table(data_df_NA, "Exoma_HGUGM_NA.bed", sep = "\t", quote = FALSE, 
+write.table(data_HGUGM_NA, "Exoma_HGUGM_NA.bed", sep = "\t", quote = FALSE, 
             row.names = FALSE, col.names = FALSE)
 
 # Use bedtools to find the intersection of the input BED file with a gene 
@@ -68,35 +68,35 @@ for (i in 1:length(text)) {
 }
 
 # Assign column names to the matrix using the original data frame
-colnames(data_matrix) <- colnames(data_df)
+colnames(data_matrix) <- colnames(data_HGUGM)
 
 # Remove the first row of the matrix (since it contains column names)
 data_matrix <- data_matrix[-1,]
 
 # Convert the matrix to a data frame
-data_df_ASD_genes <- as.data.frame(data_matrix)
+data_HGUGM_ASD_genes <- as.data.frame(data_matrix)
 
 # Remove the matrix to save memory
 rm(data_matrix)
 
 # Remove the original data frame to save memory
-rm(data_df)
+rm(data_HGUGM)
 
 # Remove the NA filled dataframe to save memory
-rm(data_df_NA)
+rm(data_HGUGM_NA)
 
 #####################DATA PREPROCESSING########################################
 
 # Replace "|" with "," in GATK.samples column
 # Replace "_" with "-" in GATK.samples column
-data_df_ASD_genes$GATK.samples <- gsub("\\|", ",", 
-                                       data_df_ASD_genes$GATK.samples)
-data_df_ASD_genes$GATK.samples <- gsub("_", "-", 
-                                       data_df_ASD_genes$GATK.samples)
+data_HGUGM_ASD_genes$GATK.samples <- gsub("\\|", ",", 
+                                       data_HGUGM_ASD_genes$GATK.samples)
+data_HGUGM_ASD_genes$GATK.samples <- gsub("_", "-", 
+                                       data_HGUGM_ASD_genes$GATK.samples)
 
 # Split comma-separated values in GATK.samples into separate rows
 # If an ID doesn't start with "G01-GEA-", add it to the beginning
-data_df_ASD_genes <- data_df_ASD_genes %>%
+data_HGUGM_ASD_genes <- data_HGUGM_ASD_genes %>%
   mutate(GATK.samples = strsplit(as.character(GATK.samples), ",")) %>%
   mutate(GATK.samples = lapply(GATK.samples, function(ids) {
     sapply(ids, function(id) {
@@ -120,7 +120,7 @@ add_hyphen <- function(x) {
 # Apply the add_hyphen function to add hyphens between the numbers and letters 
 # in each sample ID.
 # Join the list back into a comma-separated string for each row.
-data_df_ASD_genes <- data_df_ASD_genes %>%
+data_HGUGM_ASD_genes <- data_HGUGM_ASD_genes %>%
   mutate(GATK.samples = str_pad(GATK.samples, width = 15, side = "right", 
                                 pad = " ")) %>%
   mutate(GATK.samples = str_split(GATK.samples, ",")) %>%
@@ -130,7 +130,7 @@ data_df_ASD_genes <- data_df_ASD_genes %>%
 
 # Create a matrix of padded IDs from GATK.samples column
 # Pad IDs with leading zeros if needed
-sample_cols <- strsplit(data_df_ASD_genes$GATK.samples, ",")
+sample_cols <- strsplit(data_HGUGM_ASD_genes$GATK.samples, ",")
 max_cols <- max(lengths(sample_cols))
 sample_df <- matrix("", nrow = max_cols, ncol = length(sample_cols))
 
@@ -143,19 +143,19 @@ for (i in seq_along(sample_cols)) {
 }
 
 # Combine padded IDs into a comma-separated string
-data_df_ASD_genes$Padded_IDs <- apply(sample_df, 2, paste0, collapse = ",")
+data_HGUGM_ASD_genes$Padded_IDs <- apply(sample_df, 2, paste0, collapse = ",")
 
 # Remove any consecutive commas or trailing commas
-data_df_ASD_genes$Padded_IDs <- gsub(",+", ",", data_df_ASD_genes$Padded_IDs)
-data_df_ASD_genes$Padded_IDs <- gsub("[:,]+$", "", data_df_ASD_genes$Padded_IDs)
+data_HGUGM_ASD_genes$Padded_IDs <- gsub(",+", ",", data_HGUGM_ASD_genes$Padded_IDs)
+data_HGUGM_ASD_genes$Padded_IDs <- gsub("[:,]+$", "", data_HGUGM_ASD_genes$Padded_IDs)
 
-data_df_ASD_genes$Padded_IDs_short <- ""
+data_HGUGM_ASD_genes$Padded_IDs_short <- ""
 
 # Loop through each row in the dataframe 
-for (i in 1:nrow(data_df_ASD_genes)) {
+for (i in 1:nrow(data_HGUGM_ASD_genes)) {
   
   # Split the Padded_IDs string into individual IDs and loop through each one
-  ids <- unlist(strsplit(as.character(data_df_ASD_genes$Padded_IDs[i]), ","))
+  ids <- unlist(strsplit(as.character(data_HGUGM_ASD_genes$Padded_IDs[i]), ","))
   
   for (j in 1:length(ids)) {
     
@@ -172,14 +172,14 @@ for (i in 1:nrow(data_df_ASD_genes)) {
     }
   }
   # Update the Padded_IDs column with the modified IDs
-  data_df_ASD_genes$Padded_IDs_short[i] <- paste(ids, collapse = ", ")
+  data_HGUGM_ASD_genes$Padded_IDs_short[i] <- paste(ids, collapse = ", ")
 }
 
 
 ############################CREATE TRIO FILES##################################
 
 # Get unique substrings from the Padded_IDs column of the data_df_test dataframe
-unique_ids <- unique(str_extract(data_df_ASD_genes$Padded_IDs, "^G01-GEA-\\d+"))
+unique_ids <- unique(str_extract(data_HGUGM_ASD_genes$Padded_IDs, "^G01-GEA-\\d+"))
 
 # Create a new directory called "Split"
 dir.create("Split", showWarnings = FALSE)
@@ -188,7 +188,7 @@ dir.create("Split", showWarnings = FALSE)
 for (id in unique_ids) {
   
   # Create dataframe containing only rows with current ID
-  id_df <- data_df_ASD_genes[grepl(id, data_df_ASD_genes$Padded_IDs),]
+  id_df <- data_HGUGM_ASD_genes[grepl(id, data_HGUGM_ASD_genes$Padded_IDs),]
   
   # Create folder for the ID if it doesn't already exist
   folder_name <- paste0("Split/", id)
@@ -328,7 +328,8 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
       # Filters the data frame to remove any variants with a MPC score greater
       # than the input value (if provided).
       if(!is.null(MPCscore)) {
-        df <- subset(df, MPC_score <= MPCscore)
+        df$MPC_score <- as.numeric(df$MPC_score)
+        df <- subset(df, MPC_score >= MPCscore)
       }
       
       # Keeps only the rows where OMIM_ID is not NA
@@ -381,6 +382,12 @@ data_pLI_filtered_intersect <- data_pLI_filtered[,75:77]
 data_pLI_filtered_intersect$chromosome <- paste0("chr", 
                                         data_pLI_filtered_intersect$chromosome)
 
+data_pLI_filtered_intersect$start_position <- as.numeric(
+  data_pLI_filtered_intersect$start_position)
+data_pLI_filtered_intersect$start_position <- 
+  data_pLI_filtered_intersect$start_position - 1
+
+
 # Write intersect file to disk
 write.table(data_pLI_filtered_intersect, "pLI_intersect.bed", sep = "\t", 
             quote = FALSE, row.names = FALSE, col.names = FALSE)
@@ -394,25 +401,32 @@ intersect_func <- function(subdirlist) {
     
     # Find all files in subdirectory with a specific pattern
     file_list <- list.files(paste0(subdir, "/"),
-                          pattern = "^filtered_de_novo_PTV_", full.names = TRUE)
+                            pattern = "^filtered_de_novo_PTV_", full.names = TRUE)
     
     # Loop through each file and perform intersect
     for (file in file_list) {
       
-      # Read in the file and write it as a bed file
-      df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
-      bed_file <- paste0(subdir, "/", tools::file_path_sans_ext(basename(file)), 
-                         ".bed")
-      write.table(df, file = bed_file, sep = "\t", quote = FALSE, 
-                  col.names = FALSE, row.names = FALSE)
-      
-      # Perform intersect using bedtools and write output to file
-      output_file <- paste0(bed_file, "_intersect.csv")
-      system(paste("bedtools intersect -a", bed_file, 
-                   "-b ../pLI_intersect.bed -wo >", output_file))
+      # Check if the file is empty
+      if (file.info(file)$size > 0) {
+        
+        # Read in the file and write it as a bed file
+        df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
+        bed_file <- paste0(subdir, "/", tools::file_path_sans_ext(basename(file)), 
+                           ".bed")
+        write.table(df, file = bed_file, sep = "\t", quote = FALSE, 
+                    col.names = FALSE, row.names = FALSE)
+        
+        # Perform intersect using bedtools and write output to file
+        output_file <- paste0(bed_file, "_intersect.csv")
+        system(paste("bedtools intersect -a", bed_file, 
+                     "-b pLI_intersect.bed >", output_file))
+      }
     }
   }
 }
 
+
 # Call intersect function with a list of subdirectories
 intersect_func(subdirlist = subdir_list)
+
+
