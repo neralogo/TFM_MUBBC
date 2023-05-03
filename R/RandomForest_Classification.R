@@ -240,61 +240,66 @@ ntree_values <- c(250, 500, 1000, 1500, 2000)
 bestmtry <- c(1, 2, 3, 4, 5)
 
 # Initialize matrix to store accuracies for each combination of hyperparameters
-accuracy_matrix <- matrix(nrow=length(maxnodes_values)*length(ntree_values), 
-              ncol=3, dimnames=list(NULL, c("Maxnodes", "NTree", "Accuracy")))
+accuracy_matrix <- matrix(nrow=length(maxnodes_values)*length(ntree_values)*
+                            length(bestmtry), ncol=4, dimnames=list(NULL, 
+                            c("Maxnodes", "NTree", "Bestmtry", "Accuracy")))
 
 # Loop over each combination of hyperparameters
 index <- 1
 for (maxnodes in maxnodes_values) {
   for (ntree in ntree_values) {
-    
-    # Create k folds for cross-validation
-    folds <- createFolds(train_RF$Exome, k = k)
-    
-    # Initialize variable to keep track of the average accuracy across folds
-    avg_accuracy <- 0
-    
-    # Loop over each fold of cross-validation
-    for (i in 1:k) {
+    for (bestmtry in bestmtry) {
       
-      # Split the data into training and validation sets for this fold
-      train_indices <- unlist(folds[-i])
-      valid_indices <- folds[[i]]
-      train_cv <- train_RF[train_indices, ]
-      valid_cv <- train_RF[valid_indices, ]
+      # Create k folds for cross-validation
+      folds <- createFolds(train_RF$Exome, k = k)
       
-      # Train random forest model on the training set
-      rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
-                          ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
+      # Initialize variable to keep track of the average accuracy across folds
+      avg_accuracy <- 0
       
-      # Make predictions on the validation set using the trained model
-      rf_pred <- predict(rf_model, newdata = valid_cv)
+      # Loop over each fold of cross-validation
+      for (i in 1:k) {
+        
+        # Split the data into training and validation sets for this fold
+        train_indices <- unlist(folds[-i])
+        valid_indices <- folds[[i]]
+        train_cv <- train_RF[train_indices, ]
+        valid_cv <- train_RF[valid_indices, ]
+        
+        # Train random forest model on the training set
+        rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
+                            ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
+        
+        # Make predictions on the validation set using the trained model
+        rf_pred <- predict(rf_model, newdata = valid_cv)
+        
+        # Calculate the confusion matrix and accuracy score for this fold
+        confusion_matrix <- table(valid_cv$Exome, rf_pred)
+        accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
+        
+        # Add the accuracy to the running total for this combination of 
+        # hyperparameters
+        avg_accuracy <- avg_accuracy + accuracy
+        
+      }  # End of cross-validation loop
       
-      # Calculate the confusion matrix and accuracy score for this fold
-      confusion_matrix <- table(valid_cv$Exome, rf_pred)
-      accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
-      
-      # Add the accuracy to the running total for this combination of 
+      # Calculate the average accuracy across all folds for this combination of 
       # hyperparameters
-      avg_accuracy <- avg_accuracy + accuracy
+      avg_accuracy <- avg_accuracy/k
       
-    }  # End of cross-validation loop
+      # Update the accuracy matrix with the hyperparameters and accuracy
+      accuracy_matrix[index, 1] <- maxnodes
+      accuracy_matrix[index, 2] <- ntree
+      accuracy_matrix[index, 3] <- bestmtry
+      accuracy_matrix[index, 4] <- avg_accuracy
+      
+      # Increment the index for the next combination of hyperparameters
+      index <- index + 1
+      
+    } # End of bestmtry loop
     
-    # Calculate the average accuracy across all folds for this combination of 
-    # hyperparameters
-    avg_accuracy <- avg_accuracy/k
-    
-    # Update the accuracy matrix with the hyperparameters and accuracy
-    accuracy_matrix[index, 1] <- maxnodes
-    accuracy_matrix[index, 2] <- ntree
-    accuracy_matrix[index, 3] <- avg_accuracy
-    
-    # Increment the index for the next combination of hyperparameters
-    index <- index + 1
-    
-  }  
+  } # End of ntree loop
   
-}  
+} # End of maxnodes loop
 
 
 # Find the row of the accuracy matrix with the highest accuracy
@@ -303,12 +308,13 @@ best_row <- which.max(accuracy_matrix[, 3])
 # Extract the best hyperparameters from the accuracy matrix
 best_maxnodes <- accuracy_matrix[best_row, 1]
 best_ntree <- accuracy_matrix[best_row, 2]
+best_mtry <- accuracy_matrix[best_row, 3]
 
 # Train random forest model on the full training set using the best 
 # hyperparameters
 rf_model <- randomForest(Exome ~ ., data = train_RF, importance = TRUE, 
                          ntree = best_ntree, maxnodes = best_maxnodes,
-                         mtry = bestmtry)
+                         mtry = best_mtry)
 
 # Make predictions on the test set using the trained model
 rf_pred <- predict(rf_model, newdata = test_RF)
@@ -335,11 +341,10 @@ cat("\nROC AUC score on test set:", roc_auc)
 cat("\n\nConfusion Matrix:")
 print(confusion_matrix)
 
-plot(roc_obj)
-
+plot(roc_obj, main = "ROC curve")
 
 accuracy_df <- as.data.frame(accuracy_matrix)
-
+accuracy_df <- accuracy_df[complete.cases(accuracy_df),]
 
 scatter3D(x = accuracy_df$Maxnodes, y = accuracy_df$NTree, 
           z = accuracy_df$Accuracy,
@@ -349,8 +354,8 @@ scatter3D(x = accuracy_df$Maxnodes, y = accuracy_df$NTree,
           main = "Accuracy vs Maxnodes and NTree")
 
 dims <- par("usr")
-x1 <- dims[1]+ 0.81*diff(dims[1:2])
-y1 <- dims[3]+ 0.15*diff(dims[3:4])
+x1 <- dims[1]+ 0.75*diff(dims[1:2])
+y1 <- dims[3]+ 0.17*diff(dims[3:4])
 x2 <- dims[1]+ 0.49*diff(dims[1:2])
 y2 <- dims[3]- 0.009*diff(dims[3:4])
 text(x1,y1,expression(NTree),srt=60)
