@@ -146,8 +146,10 @@ for (i in seq_along(sample_cols)) {
 data_HGUGM_ASD_genes$Padded_IDs <- apply(sample_df, 2, paste0, collapse = ",")
 
 # Remove any consecutive commas or trailing commas
-data_HGUGM_ASD_genes$Padded_IDs <- gsub(",+", ",", data_HGUGM_ASD_genes$Padded_IDs)
-data_HGUGM_ASD_genes$Padded_IDs <- gsub("[:,]+$", "", data_HGUGM_ASD_genes$Padded_IDs)
+data_HGUGM_ASD_genes$Padded_IDs <- gsub(",+", ",", 
+                                        data_HGUGM_ASD_genes$Padded_IDs)
+data_HGUGM_ASD_genes$Padded_IDs <- gsub("[:,]+$", "", 
+                                        data_HGUGM_ASD_genes$Padded_IDs)
 
 data_HGUGM_ASD_genes$Padded_IDs_short <- ""
 
@@ -179,7 +181,8 @@ for (i in 1:nrow(data_HGUGM_ASD_genes)) {
 ############################CREATE TRIO FILES##################################
 
 # Get unique substrings from the Padded_IDs column of the data_df_test dataframe
-unique_ids <- unique(str_extract(data_HGUGM_ASD_genes$Padded_IDs, "^G01-GEA-\\d+"))
+unique_ids <- unique(str_extract(data_HGUGM_ASD_genes$Padded_IDs, 
+                                 "^G01-GEA-\\d+"))
 
 # Create a new directory called "Split"
 dir.create("Split", showWarnings = FALSE)
@@ -373,14 +376,15 @@ data_pLI_filtered <- subset(data_pLI, pLI >= 0.9)
 # Subset data to only relevant columns and format chromosome column (chr, start,
 # end)
 data_pLI_filtered_intersect <- data_pLI_filtered[,75:77]
+# Format chromosome column (add "chr" prefix)
 data_pLI_filtered_intersect$chromosome <- paste0("chr", 
                                         data_pLI_filtered_intersect$chromosome)
 
+# Convert start_position column to numeric and subtract 1 from each value
 data_pLI_filtered_intersect$start_position <- as.numeric(
   data_pLI_filtered_intersect$start_position)
 data_pLI_filtered_intersect$start_position <- 
   data_pLI_filtered_intersect$start_position - 1
-
 
 # Write intersect file to disk
 write.table(data_pLI_filtered_intersect, "pLI_intersect.bed", sep = "\t", 
@@ -395,7 +399,7 @@ intersect_func <- function(subdirlist) {
     
     # Find all files in subdirectory with a specific pattern
     file_list <- list.files(paste0(subdir, "/"),
-                            pattern = "^filtered_de_novo_PTV_", full.names = TRUE)
+                          pattern = "^filtered_de_novo_PTV_", full.names = TRUE)
     
     # Loop through each file and perform intersect
     for (file in file_list) {
@@ -405,8 +409,8 @@ intersect_func <- function(subdirlist) {
         
         # Read in the file and write it as a bed file
         df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
-        bed_file <- paste0(subdir, "/", tools::file_path_sans_ext(basename(file)), 
-                           ".bed")
+        bed_file <- paste0(subdir, "/", 
+                           tools::file_path_sans_ext(basename(file)), ".bed")
         write.table(df, file = bed_file, sep = "\t", quote = FALSE, 
                     col.names = FALSE, row.names = FALSE)
         
