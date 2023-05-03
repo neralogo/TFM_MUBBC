@@ -11,7 +11,7 @@ Padded_IDs column.
 \usage{
 keep_de_novo(df, id)
 df = dataframe_name
-id = id_value_name
+id = ID_substring
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{ 
