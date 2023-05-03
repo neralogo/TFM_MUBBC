@@ -33,8 +33,8 @@ data_HGUGM <- as.data.frame(data_matrix)
 rm(data_matrix)
 
 # Replace empty values and NAs with "NA" in the data frame
-data_HGUGM_NA <- data.frame(lapply(data_HGUGM, function(x) ifelse(is.na(x) | x == "",
-                                                            "NA", x)))
+data_HGUGM_NA <- data.frame(lapply(data_HGUGM, 
+                              function(x) ifelse(is.na(x) | x == "","NA", x)))
 
 # Prepend "chr" to the chromosome column
 data_HGUGM_NA$Chr <- paste0("chr", data_HGUGM_NA$Chr)
@@ -422,5 +422,3 @@ intersect_func <- function(subdirlist) {
 
 # Call intersect function with a list of subdirectories
 intersect_func(subdirlist = subdir_list)
-
-
