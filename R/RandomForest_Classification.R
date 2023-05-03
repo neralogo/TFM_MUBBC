@@ -1,4 +1,4 @@
-# Load necessary packages
+############################# LOAD PACKAGES ###################################
 
 library(dplyr)      # Provides a set of functions for data manipulation and 
 #transformation
@@ -12,8 +12,9 @@ library(ggplot2)    # Provides a set of functions for data visualization
 library(mltools)    # Provides a set of functions for machine learning tasks
 library(ggtext)     # Provides a set of functions for using formatted text in 
 #ggplot2 graphics
-library(pROC)       # Provides functions for analyzing and visualizing ROC curves
-library(plot3D)
+library(pROC)     # Provides functions for analyzing and visualizing ROC curves
+library(plot3D)     # Provides functions for creating various types of 3D plots, 
+# including surface plots, scatter plots, and wireframe plots. 
 
 # Sets the seed for reproducibility
 set.seed(123)
@@ -45,8 +46,8 @@ df <- df %>%
 
 # Remove rows with missing values in specific columns
 df_no_ID <- df[,c(2:10)]
-df_no_ID <- df_no_ID[complete.cases(df_no_ID[, c("Age_F_Birth", "Age_symptoms")]), ]
-
+df_no_ID <- df_no_ID[complete.cases(df_no_ID[,
+                                    c("Age_F_Birth", "Age_symptoms")]), ]
 
 # Create a frequency table and plot a bar chart of the poportion of Exome values
 table(df_no_ID$Exome)
@@ -72,7 +73,7 @@ mean(is.na(df_no_ID$Epilepsy)) * 100
 
 # Run multiple imputation on the data using the mice package
 mice_object <- mice(df_no_ID[,-9], m = 5, maxit = 50, method = c("", "", "",
-                                                                 "polyreg", "pmm", "logreg", "", ""))
+                                         "polyreg", "pmm", "logreg", "", ""))
 
 # Retrieve the imputed data from the mice object
 imputed_data <- complete(mice_object)
@@ -93,8 +94,8 @@ df_imp <- data.frame(x = dens_imp$x, y = dens_imp$y, type = "Imputed data")
 
 # Plot the density distributions using ggplot
 ggplot(data = data.frame(x = c(dens_orig$x, dens_imp$x), y = c(dens_orig$y, 
-                                                               dens_imp$y), type = rep(c("Original data", "Imputed data"), 
-                                                                                       each = length(dens_orig$x))), aes(x = x, y = y, color = type)) +
+       dens_imp$y), type = rep(c("Original data", "Imputed data"), 
+       each = length(dens_orig$x))), aes(x = x, y = y, color = type)) +
   geom_line(size = 0.5) +
   labs(x = "Age in months", y = "Density distribution", title = "Age walking") +
   scale_color_manual(values = c("blue", "red")) +
@@ -106,13 +107,14 @@ ggplot(data = data.frame(x = c(dens_orig$x, dens_imp$x), y = c(dens_orig$y,
 ############################## DATA BALANCING ##################################
 
 # Create training and testing partitions to evaluate the balancing models
-trainIndex_BALANCE <- createDataPartition(imputed_data$Exome, p = 0.7, list = FALSE)
+trainIndex_BALANCE <- createDataPartition(imputed_data$Exome, p = 0.7, 
+                                          list = FALSE)
 train_balance <- imputed_data[trainIndex_BALANCE, ]
 test_balance <- imputed_data[-trainIndex_BALANCE, ]
 
 # Set up the train control parameters
-ctrl <- trainControl(method = "cv", number = 5, summaryFunction = twoClassSummary, 
-                     classProbs = TRUE)
+ctrl <- trainControl(method = "cv", number = 5, 
+                     summaryFunction = twoClassSummary, classProbs = TRUE)
 
 # Define the sampling methods to use
 sampling_methods <- c("none", "under", "over", "smotenc")
@@ -130,21 +132,22 @@ for (method in sampling_methods) {
   } 
   # Use the undersampling method to balance the classes
   else if (method == "down") {
-    train_balanced <- caret::downSample(x = train_balance[, -9], y = train_balance$Exome, 
-                                        yname = "Exome")
+    train_balanced <- caret::downSample(x = train_balance[, -9], 
+                                      y = train_balance$Exome, yname = "Exome")
     model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
                           trControl = ctrl, importance = TRUE)
   } 
   # Use the oversampling method to balance the classes
   else if (method == "over") {
-    train_balanced <- caret::upSample(x = train_balance[, -9], y = train_balance$Exome, 
-                                      yname = "Exome")
+    train_balanced <- caret::upSample(x = train_balance[, -9], 
+                                      y = train_balance$Exome, yname = "Exome")
     model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
                           trControl = ctrl, importance = TRUE)
   } 
   # Use the SMOTE-NC method to balance the classes 
   else if (method == "smotenc") {
-    train_balanced <- smotenc(train_balance, var = "Exome", k = 5, over_ratio = 1)
+    train_balanced <- smotenc(train_balance, var = "Exome", k = 5, 
+                              over_ratio = 1)
     model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
                           trControl = ctrl, importance = TRUE)
   }
@@ -165,7 +168,8 @@ for (method in sampling_methods) {
   # Generate predicted probabilites for the test data
   pred_prob <- predict(model, newdata = test_balance, type = "prob")[, 2]
   
-  # Convertt predicted probabilites to predicted class levels (Positive or Negative)
+  # Convertt predicted probabilites to predicted class levels (Positive or 
+  # Negative)
   pred_class <- ifelse(pred_prob > 0.5, "Positive", "Negative")
   
   # Store the evaluation metrics for the current sampling method in a dataframe
@@ -176,16 +180,19 @@ for (method in sampling_methods) {
                                  positive = "Exome"),
     Sensitivity = caret::recall(as.factor(pred_class), test_balance$Exome, 
                                 positive = "Exome"),
-    F1 = caret::F_meas(as.factor(pred_class), test_balance$Exome, positive = "Exome")
+    F1 = caret::F_meas(as.factor(pred_class), test_balance$Exome, 
+                       positive = "Exome")
   )
 }
 
-# Combine the evaluation results for all sampling methods into a single data frame
+# Combine the evaluation results for all sampling methods into a single data
+# frame
 evaluations_df <- do.call(rbind, evaluations)
 
 # Identify the best sampling method based on the average performance across all 
 # evaluation metrics
-best_method <- evaluations_df[which.max(rowMeans(evaluations_df[, -1])), "Method"]
+best_method <- evaluations_df[which.max(rowMeans(evaluations_df[, -1])),
+                              "Method"]
 
 # Reshape the evaluation data frame into a long formato for plotting
 evaluations_long <- reshape2::melt(evaluations, id.vars = "Method")
@@ -205,12 +212,14 @@ if (best_method == "over") {
                                  yname = "Exome")
 } else if (best_method == "under") {
   # Downsample the majority class using caret's downSample function
-  balanced_df <- caret::downSample(x = imputed_data[, -9], y = imputed_data$Exome)
+  balanced_df <- caret::downSample(x = imputed_data[, -9], 
+                                   y = imputed_data$Exome)
 } else if (best_method == "smotenc") {
   # Use SMOTENC algorithm to synthetically oversample the minority class
   balanced_df <- smotenc(imputed_data, var = "Exome", k = 5, over_ratio = 1)
 } else if (best_method == "none") {
-  # If the best method is "none", use the original imputed data without any sampling
+  # If the best method is "none", use the original imputed data without any 
+  # sampling
   balanced_df <- imputed_data
 }
 
@@ -224,7 +233,7 @@ test_RF <- balanced_df[-trainIndex_RF, ]
 
 # Find the best metric value for the 
 bestmtry <- tuneRF(train_RF[,-9], train_RF[,9], mtryStart = 1, ntreeTry = 100, 
-                   improve = 0.01, stepFactor = 2, trace = T, plot = T, doBest = F)
+                improve = 0.01, stepFactor = 2, trace = T, plot = T, doBest = F)
 
 bestmtry <- which.max(bestmtry)
 
@@ -237,8 +246,7 @@ ntree_values <- c(250, 500, 1000, 1500, 2000)
 
 # Initialize matrix to store accuracies for each combination of hyperparameters
 accuracy_matrix <- matrix(nrow=length(maxnodes_values)*length(ntree_values), 
-                          ncol=3, 
-                          dimnames=list(NULL, c("Maxnodes", "NTree", "Accuracy")))
+              ncol=3, dimnames=list(NULL, c("Maxnodes", "NTree", "Accuracy")))
 
 # Loop over each combination of hyperparameters
 index <- 1
@@ -262,7 +270,7 @@ for (maxnodes in maxnodes_values) {
       
       # Train random forest model on the training set
       rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
-                               ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
+                          ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
       
       # Make predictions on the validation set using the trained model
       rf_pred <- predict(rf_model, newdata = valid_cv)
@@ -271,12 +279,14 @@ for (maxnodes in maxnodes_values) {
       confusion_matrix <- table(valid_cv$Exome, rf_pred)
       accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
       
-      # Add the accuracy to the running total for this combination of hyperparameters
+      # Add the accuracy to the running total for this combination of 
+      # hyperparameters
       avg_accuracy <- avg_accuracy + accuracy
       
     }  # End of cross-validation loop
     
-    # Calculate the average accuracy across all folds for this combination of hyperparameters
+    # Calculate the average accuracy across all folds for this combination of 
+    # hyperparameters
     avg_accuracy <- avg_accuracy/k
     
     # Update the accuracy matrix with the hyperparameters and accuracy
@@ -287,9 +297,9 @@ for (maxnodes in maxnodes_values) {
     # Increment the index for the next combination of hyperparameters
     index <- index + 1
     
-  }  # End of ntree loop
+  }  
   
-}  # End of maxnodes loop
+}  
 
 
 # Find the row of the accuracy matrix with the highest accuracy
@@ -299,7 +309,8 @@ best_row <- which.max(accuracy_matrix[, 3])
 best_maxnodes <- accuracy_matrix[best_row, 1]
 best_ntree <- accuracy_matrix[best_row, 2]
 
-# Train random forest model on the full training set using the best hyperparameters
+# Train random forest model on the full training set using the best 
+# hyperparameters
 rf_model <- randomForest(Exome ~ ., data = train_RF, importance = TRUE, 
                          ntree = best_ntree, maxnodes = best_maxnodes,
                          mtry = bestmtry)
@@ -311,20 +322,32 @@ rf_pred <- predict(rf_model, newdata = test_RF)
 confusion_matrix <- table(test_RF$Exome, rf_pred)
 accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
 
-# Print the confusion matrix and accuracy on the test set, 
-# as well as the best hyperparameters used
-cat("\nBest Maxnodes:", best_maxnodes)
-cat("\nBest NTree:", best_ntree)
-cat("\nBest mtry:", bestmtry)
+# Compute sensitivity and F1 score
+sensitivity_val <- sensitivity(confusion_matrix)
+f1_score_val <- f1_score(confusion_matrix)
+
+# Compute ROC curve and ROC AUC score
+roc_obj <- roc(test_RF$Exome, predict(rf_model, newdata = test_RF, 
+                                      type = "prob")[,2])
+roc_auc <- auc(roc_obj)
+
+# Print the confusion matrix, accuracy, sensitivity, F1 score, and ROC AUC 
+# score on the test set
 cat("\nAccuracy on test set:", accuracy)
+cat("\nSensitivity on test set:", sensitivity_val)
+cat("\nF1 score on test set:", f1_score_val)
+cat("\nROC AUC score on test set:", roc_auc)
 cat("\n\nConfusion Matrix:")
 print(confusion_matrix)
+
+plot(roc_obj)
 
 
 accuracy_df <- as.data.frame(accuracy_matrix)
 
 
-scatter3D(x = accuracy_df$Maxnodes, y = accuracy_df$NTree, z = accuracy_df$Accuracy,
+scatter3D(x = accuracy_df$Maxnodes, y = accuracy_df$NTree, 
+          z = accuracy_df$Accuracy,
           phi = 15, theta = 30, colvar = accuracy_df$Accuracy,
           pch = 16, cex = 2, type = "h", ticktype = "detailed", 
           xlab = "Maxnodes", ylab = "", zlab = "",
@@ -344,3 +367,4 @@ var_imp <- var_imp[order(var_imp[,4], decreasing = TRUE), ]
 var_imp <- as.data.frame(var_imp)
 print(var_imp)
 varImpPlot(rf_model, main = "Variable importance of model")
+
