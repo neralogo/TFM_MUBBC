@@ -231,18 +231,13 @@ trainIndex_RF <- createDataPartition(balanced_df$Exome, p = 0.7, list = FALSE)
 train_RF <- balanced_df[trainIndex_RF, ]
 test_RF <- balanced_df[-trainIndex_RF, ]
 
-# Find the best metric value for the 
-bestmtry <- tuneRF(train_RF[,-9], train_RF[,9], mtryStart = 1, ntreeTry = 100, 
-                improve = 0.01, stepFactor = 2, trace = T, plot = T, doBest = F)
-
-bestmtry <- which.max(bestmtry)
-
 # Set the number of folds for cross-validation
 k <- 5
 
 # Define the values of maxnodes and ntree to test
 maxnodes_values <- c(3, 4, 5, 6, 7)
 ntree_values <- c(250, 500, 1000, 1500, 2000)
+bestmtry <- c(1, 2, 3, 4, 5)
 
 # Initialize matrix to store accuracies for each combination of hyperparameters
 accuracy_matrix <- matrix(nrow=length(maxnodes_values)*length(ntree_values), 
@@ -324,7 +319,7 @@ accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
 
 # Compute sensitivity and F1 score
 sensitivity_val <- sensitivity(confusion_matrix)
-f1_score_val <- f1_score(confusion_matrix)
+f1_score_val <- F_meas(confusion_matrix)
 
 # Compute ROC curve and ROC AUC score
 roc_obj <- roc(test_RF$Exome, predict(rf_model, newdata = test_RF, 
