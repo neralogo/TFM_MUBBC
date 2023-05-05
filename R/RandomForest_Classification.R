@@ -373,3 +373,4 @@ reprtree::plot.getTree(rf_model)
 
 tree <- getTree(rf_model, k=1, labelVar=TRUE)
 realtree <- reprtree:::as.tree(tree, rf_model)
+
