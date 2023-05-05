@@ -96,7 +96,7 @@ df_imp <- data.frame(x = dens_imp$x, y = dens_imp$y, type = "Imputed data")
 ggplot(data = data.frame(x = c(dens_orig$x, dens_imp$x), y = c(dens_orig$y, 
        dens_imp$y), type = rep(c("Original data", "Imputed data"), 
        each = length(dens_orig$x))), aes(x = x, y = y, color = type)) +
-  geom_line(size = 0.5) +
+  geom_line(linewidth = 0.5) +
   labs(x = "Age in months", y = "Density distribution", title = "Age walking") +
   scale_color_manual(values = c("blue", "red")) +
   theme(legend.position = "right") +
@@ -165,24 +165,25 @@ for (method in sampling_methods) {
   # Get the model trained using the current sampling method
   model <- results[[method]]
   
-  # Generate predicted probabilites for the test data
+  # Generate predicted probabilities for the test data
   pred_prob <- predict(model, newdata = test_balance, type = "prob")[, 2]
   
-  # Convertt predicted probabilites to predicted class levels (Positive or 
-  # Negative)
-  pred_class <- ifelse(pred_prob > 0.5, "Positive", "Negative")
+  # Convert predicted probabilities to predicted class levels (Positive or Negative)
+  pred_class <- ifelse(pred_prob < 0.5, "Negative", "Positive")
+  
+  # Generate the confusion matrix using the predicted class levels and true classes
+  cm <- confusionMatrix(data = as.factor(pred_class), 
+                        reference = test_balance$Exome, mode = "prec_recall")
   
   # Store the evaluation metrics for the current sampling method in a dataframe
   evaluations[[method]] <- data.frame(
     Method = method,
-    ROC = roc(test_balance$Exome, pred_prob)$auc,
-    Precision = caret::precision(as.factor(pred_class), test_balance$Exome, 
-                                 positive = "Exome"),
-    Sensitivity = caret::recall(as.factor(pred_class), test_balance$Exome, 
-                                positive = "Exome"),
-    F1 = caret::F_meas(as.factor(pred_class), test_balance$Exome, 
-                       positive = "Exome")
+    AUC = roc(test_balance$Exome, pred_prob)$auc,
+    Precision = cm$byClass["Precision"],
+    Sensitivity = cm$byClass["Sensitivity"],
+    F1 = cm$byClass["F1"]
   )
+  
 }
 
 # Combine the evaluation results for all sampling methods into a single data
@@ -295,15 +296,13 @@ for (maxnodes in maxnodes_values) {
       # Increment the index for the next combination of hyperparameters
       index <- index + 1
       
-    } # End of bestmtry loop
-    
-  } # End of ntree loop
-  
-} # End of maxnodes loop
+    } 
+  }
+} 
 
 
 # Find the row of the accuracy matrix with the highest accuracy
-best_row <- which.max(accuracy_matrix[, 3])
+best_row <- which.max(accuracy_matrix[, 4])
 
 # Extract the best hyperparameters from the accuracy matrix
 best_maxnodes <- accuracy_matrix[best_row, 1]
@@ -357,14 +356,20 @@ dims <- par("usr")
 x1 <- dims[1]+ 0.75*diff(dims[1:2])
 y1 <- dims[3]+ 0.17*diff(dims[3:4])
 x2 <- dims[1]+ 0.49*diff(dims[1:2])
-y2 <- dims[3]- 0.009*diff(dims[3:4])
+y2 <- dims[3]- 0.000000007*diff(dims[3:4])
 text(x1,y1,expression(NTree),srt=60)
 text(y2,x2,expression(Accuracy),srt=90)
 
 # Calculate and print the variable importance of the model
-var_imp <- randomForest::importance(rf_model)
+var_imp <- importance(rf_model)
 var_imp <- var_imp[order(var_imp[,4], decreasing = TRUE), ]
 var_imp <- as.data.frame(var_imp)
 print(var_imp)
-varImpPlot(rf_model, main = "Variable importance of model")
+varImpPlot(rf_model, main = "Variable importance of model", type = 1, sort = T)
 
+#Plot the tree for the model
+reprtree::plot.getTree(rf_model)
+
+
+tree <- getTree(rf_model, k=1, labelVar=TRUE)
+realtree <- reprtree:::as.tree(tree, rf_model)
