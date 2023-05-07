@@ -15,6 +15,7 @@ library(ggtext)     # Provides a set of functions for using formatted text in
 library(pROC)     # Provides functions for analyzing and visualizing ROC curves
 library(plot3D)     # Provides functions for creating various types of 3D plots, 
 # including surface plots, scatter plots, and wireframe plots. 
+library(tidyverse)
 
 # Sets the seed for reproducibility
 set.seed(123)
@@ -57,11 +58,22 @@ barplot(freq_table,
         xlab = "Exome", 
         ylab = "Frequency", 
         col = my_colors, 
-        main = "")
+        main = "",
+        ylim = c(0, max(freq_table)*1.2))
+
 title(main = c("Proportion positive /", "negative cases"), 
-      line = 1, 
+      line = 2, 
       cex.main = 1.3)
 
+# Add the percentage values on top of each bar
+for (i in 1:length(freq_table)) {
+  text(x = i, 
+       y = freq_table[i], 
+       labels = paste0(round(prop.table(freq_table) * 100)[i], "%"),
+       col = "black", 
+       cex = 0.9, 
+       pos = 3)
+}
 
 # Calculate rows with missing values in specific columns
 mean(is.na(df_no_ID$Age_walking)) * 100
@@ -127,28 +139,28 @@ for (method in sampling_methods) {
   
   # Use the "none" method as the baseline (no method)
   if (method == "none") {
-    model <- caret::train(Exome ~ ., data = train_balance, method = "rf", 
+    model <- randomForest(Exome ~ ., data = train_balance, 
                           trControl = ctrl, importance = TRUE)
   } 
   # Use the undersampling method to balance the classes
   else if (method == "down") {
     train_balanced <- caret::downSample(x = train_balance[, -9], 
                                       y = train_balance$Exome, yname = "Exome")
-    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
+    model <- randomForest(Exome ~ ., data = train_balanced, 
                           trControl = ctrl, importance = TRUE)
   } 
   # Use the oversampling method to balance the classes
   else if (method == "over") {
     train_balanced <- caret::upSample(x = train_balance[, -9], 
                                       y = train_balance$Exome, yname = "Exome")
-    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
+    model <- randomForest(Exome ~ ., data = train_balanced, 
                           trControl = ctrl, importance = TRUE)
   } 
   # Use the SMOTE-NC method to balance the classes 
   else if (method == "smotenc") {
     train_balanced <- smotenc(train_balance, var = "Exome", k = 5, 
                               over_ratio = 1)
-    model <- caret::train(Exome ~ ., data = train_balanced, method = "rf", 
+    model <- randomForest(Exome ~ ., data = train_balanced, 
                           trControl = ctrl, importance = TRUE)
   }
   
@@ -168,10 +180,12 @@ for (method in sampling_methods) {
   # Generate predicted probabilities for the test data
   pred_prob <- predict(model, newdata = test_balance, type = "prob")[, 2]
   
-  # Convert predicted probabilities to predicted class levels (Positive or Negative)
+  # Convert predicted probabilities to predicted class levels (Positive or 
+  # Negative)
   pred_class <- ifelse(pred_prob < 0.5, "Negative", "Positive")
   
-  # Generate the confusion matrix using the predicted class levels and true classes
+  # Generate the confusion matrix using the predicted class levels and true 
+  # classes
   cm <- confusionMatrix(data = as.factor(pred_class), 
                         reference = test_balance$Exome, mode = "prec_recall")
   
@@ -340,11 +354,15 @@ cat("\nROC AUC score on test set:", roc_auc)
 cat("\n\nConfusion Matrix:")
 print(confusion_matrix)
 
+# Plot ROC curve
 plot(roc_obj, main = "ROC curve")
 
+# Create a data frame from the accuracy matrix and remove rows with NA values
 accuracy_df <- as.data.frame(accuracy_matrix)
 accuracy_df <- accuracy_df[complete.cases(accuracy_df),]
 
+# Plot a 3D scatter plot withe Maxnodes and NTree as x and t axes
+# Accuracy as z axis, and color representing Accuracy
 scatter3D(x = accuracy_df$Maxnodes, y = accuracy_df$NTree, 
           z = accuracy_df$Accuracy,
           phi = 15, theta = 30, colvar = accuracy_df$Accuracy,
@@ -352,11 +370,12 @@ scatter3D(x = accuracy_df$Maxnodes, y = accuracy_df$NTree,
           xlab = "Maxnodes", ylab = "", zlab = "",
           main = "Accuracy vs Maxnodes and NTree")
 
+# Add axis labels for Ntree and Accuracy
 dims <- par("usr")
 x1 <- dims[1]+ 0.75*diff(dims[1:2])
 y1 <- dims[3]+ 0.17*diff(dims[3:4])
 x2 <- dims[1]+ 0.49*diff(dims[1:2])
-y2 <- dims[3]- 0.000000007*diff(dims[3:4])
+y2 <- dims[3]- 0.04*diff(dims[3:4])
 text(x1,y1,expression(NTree),srt=60)
 text(y2,x2,expression(Accuracy),srt=90)
 
@@ -365,12 +384,66 @@ var_imp <- importance(rf_model)
 var_imp <- var_imp[order(var_imp[,4], decreasing = TRUE), ]
 var_imp <- as.data.frame(var_imp)
 print(var_imp)
-varImpPlot(rf_model, main = "Variable importance of model", type = 1, sort = T)
+
+# Plot the variable importance scores for each variable
+varImpPlot(rf_model, main = "Variable importance of model", sort = T)
 
 #Plot the tree for the model
-reprtree::plot.getTree(rf_model)
+reprtree::plot.getTree(rf_model, k = 4)
 
+# Define the function to calculate the percentage of positive cases
+calc_percentage <- function(data) {
+  # Split the patients to 7 groups based on the values for each variable on 
+  # each node
+  split1 <- ifelse(data$Age_walking <= 12,
+                   ifelse(data$Age_walking <= 10.7,
+                          ifelse(data$Age_F_Birth <= 35, "Group1", "Group2"),
+                          ifelse(data$Age_M_Birth <= 29.5, "Group3", "Group4")),
+                   ifelse(data$Age_F_Birth <= 39.7, 
+                          ifelse(data$Epilepsy == "Yes", "Group5", "Group6"),
+                          "Group7"))
+  
+  # Create a new data frame with the groups and Exome variable
+  groups <- data.frame(Group = split1, Exome = data$Exome)
+  
+  # Calculate the percentage of positive cases for each group
+  percentage_positive <- aggregate(Exome ~ Group, data = groups,
+                                   FUN = function(x) 100 * sum(x == "Positive") 
+                                   / length(x))
+  
+  # Use complete to ensure that all groups are included in each bootstrap sample
+  percentage_positive <- complete(percentage_positive, Group = c("Group1", 
+                  "Group2", "Group3", "Group4", "Group5", "Group6", "Group7"))
+  
+  return(percentage_positive$Exome)
+}
 
-tree <- getTree(rf_model, k=1, labelVar=TRUE)
-realtree <- reprtree:::as.tree(tree, rf_model)
+# Set the bootstraping value to 1000
+n_boot <- 1000
 
+# Perform the bootstrap resampling to estimate confidence intervals for 
+# percentage of positive results
+boot_results <- replicate(n_boot, {
+  boot_data <- imputed_data[sample(nrow(imputed_data), replace = TRUE), ]
+  calc_percentage(boot_data)
+})
+
+# Transpose the matrix so each row represents the percentage of positive results
+# for a single group across all bootstrap samples
+boot_results <- t(boot_results)
+
+# Replace NA values in the secon column with 0, as there are missing values in
+# some of the bootstrap samples
+boot_results[, 2] <- replace(boot_results[, 2], is.na(boot_results[, 2]), 0)
+
+# Calculate mean and confidence interval for each column
+boot_mean <- apply(boot_results, 2, mean, na.rm = TRUE)
+boot_ci <- t(apply(boot_results, 2, function(x) quantile(x, 
+                                      probs = c(0.025, 0.975), na.rm = TRUE)))
+
+# Combine mean and confidence interval into a data frame
+boot_summary <- data.frame(Group = c("Group1", "Group2", "Group3", "Group4", 
+                                     "Group5", "Group6", "Group7"),
+                           Mean = boot_mean,
+                           Lower_CI = boot_ci[,1],
+                           Upper_CI = boot_ci[,2])
