@@ -418,6 +418,9 @@ calc_percentage <- function(data) {
   return(percentage_positive$Exome)
 }
 
+# Check the patient distribution in each group
+table(split1)
+
 # Set the bootstraping value to 1000
 n_boot <- 1000
 
