@@ -1,7 +1,9 @@
 ############################# LOAD PACKAGES ###################################
 
-library(dplyr)      # Provides a set of functions for data manipulation and 
-#transformation
+library(tidyverse)  # collection of R packages designed for data science. It is 
+# designed to make it easy to install and load multiple packages needed for data 
+# analysis. The packages included are: ggplot2, dplyr, tidyr, readr, purrr,
+# tibble, stringr and forcats
 library(mice)       # Provides multiple imputation for missing data
 library(caret)      # Provides a set of functions for training and evaluating 
 #predictive models
@@ -15,7 +17,7 @@ library(ggtext)     # Provides a set of functions for using formatted text in
 library(pROC)     # Provides functions for analyzing and visualizing ROC curves
 library(plot3D)     # Provides functions for creating various types of 3D plots, 
 # including surface plots, scatter plots, and wireframe plots. 
-library(tidyverse)
+
 
 # Sets the seed for reproducibility
 set.seed(123)
