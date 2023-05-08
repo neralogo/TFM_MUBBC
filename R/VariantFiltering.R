@@ -8,20 +8,19 @@ library(stringr)
 # Read file and save as data frame
 Exomas_HGUGM_autismo <- read.delim("Exomas_HGUGM_autismo.tab")
 
-# Replace empty values and NAs with "NA" in the data frame
-Exomas_HGUGM_NA <- data.frame(lapply(Exomas_HGUGM_autismo, 
-                              function(x) ifelse(is.na(x) | x == "","NA", x)))
+Exomas_HGUGM_autismo <-  data.frame(lapply(Exomas_HGUGM_autismo, 
+                   function(x) ifelse(is.na(x) | x == "","NA", x)))
 
 # Prepend "chr" to the chromosome column
-Exomas_HGUGM_NA$Chr <- paste0("chr", Exomas_HGUGM_NA$Chr)
+Exomas_HGUGM_autismo$Chr <- paste0("chr", Exomas_HGUGM_autismo$Chr)
 
 # Convert start positions to numeric values and subtract 1 (bedtools requires 
 # 0-based start positions)
-Exomas_HGUGM_NA$Start <- as.numeric(Exomas_HGUGM_NA$Start)
-Exomas_HGUGM_NA$Start <- Exomas_HGUGM_NA$Start - 1
+Exomas_HGUGM_autismo$Start <- as.numeric(Exomas_HGUGM_autismo$Start)
+Exomas_HGUGM_autismo$Start <- Exomas_HGUGM_autismo$Start - 1
 
 # Write the modified data frame to a file in BED format
-write.table(Exomas_HGUGM_NA, "Exoma_HGUGM.bed", sep = "\t", quote = FALSE, 
+write.table(Exomas_HGUGM_autismo, "Exoma_HGUGM.bed", sep = "\t", quote = FALSE, 
             row.names = FALSE, col.names = FALSE)
 
 # Use bedtools to find the intersection of the input BED file with a gene 
@@ -32,13 +31,10 @@ system("bedtools intersect -a Exoma_HGUGM.bed -b GENE_BBDD.bed > intersect.bed")
 Exomas_ASD_autismo <- read.delim("intersect.bed", header=FALSE)
 
 # Assign column names to the matrix using the original data frame
-colnames(Exomas_ASD_autismo) <- colnames(Exomas_HGUGM_NA)
+colnames(Exomas_ASD_autismo) <- colnames(Exomas_HGUGM_autismo)
 
 # Remove the original data frame to save memory
 rm(Exomas_HGUGM_autismo)
-
-# Remove the NA filled dataframe to save memory
-rm(Exomas_HGUGM_NA)
 
 #####################DATA PREPROCESSING########################################
 
@@ -231,7 +227,7 @@ for (subdir in subdir_list) {
 #···················Filtering de novo pathogenic variants······················
 
 filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL, 
-                  gatkcounts = NULL, MPCscore = NULL, filename_filter) {
+                            gatkcounts = NULL, MPCscore = NULL, filename_filter) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
@@ -250,9 +246,9 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
         # Remove 3' and 5' variants, downstream, intronic, missense, and 
         # synonymous
         df <- subset(df, (grepl("frameshift", df$Annotation.RefSeq) | 
-                             grepl("stop_gained", df$Annotation.RefSeq) | 
-                             grepl("stop_lost", df$Annotation.RefSeq) |
-                             grepl("start_lost", df$Annotation.RefSeq)))
+                            grepl("stop_gained", df$Annotation.RefSeq) | 
+                            grepl("stop_lost", df$Annotation.RefSeq) |
+                            grepl("start_lost", df$Annotation.RefSeq)))
       } 
       
       # Filter for missense variants
@@ -285,6 +281,9 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
       # Keeps only the rows where OMIM_ID is not NA
       df <- df[!is.na(df$OMIM_ID),]
       
+      # Filters the data frame to remove any rows containing "MA" or "PA" in the "Padded_IDs_short" column.
+      df <- subset(df, !grepl("MA|PA", Padded_IDs_short))
+      
       # Creates a new file with the filtered data and writes it to disk. The 
       # new file is saved with a name based on the original file name and the 
       # input parameters.
@@ -294,6 +293,7 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
     }
   }
 }
+
 
 # De novo PTV variants
 filter_variants(subdir_list = subdir_list, variant_type = "PTV", 
@@ -312,7 +312,7 @@ data_pLI_filtered <- subset(data_pLI, pLI >= 0.9)
 
 # Subset data to only relevant columns and format chromosome column (chr, start,
 # end)
-data_pLI_filtered_intersect <- data_pLI_filtered[,75:77]
+data_pLI_filtered_intersectq <- data_pLI_filtered[,75:77]
 # Format chromosome column (add "chr" prefix)
 data_pLI_filtered_intersect$chromosome <- paste0("chr", 
                                         data_pLI_filtered_intersect$chromosome)
@@ -351,7 +351,7 @@ intersect_func <- function(subdirlist) {
       if (file.info(file)$size > 0) {
         
         # Read in the file and write it as a bed file
-        df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
+        df <- read.csv(file, header = T, stringsAsFactors = FALSE)
         bed_file <- paste0(subdir, "/", 
                            tools::file_path_sans_ext(basename(file)), ".bed")
         write.table(df, file = bed_file, sep = "\t", quote = FALSE, 
