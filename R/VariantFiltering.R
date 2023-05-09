@@ -227,7 +227,7 @@ for (subdir in subdir_list) {
 #···················Filtering de novo pathogenic variants······················
 
 filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL, 
-                            gatkcounts = NULL, MPCscore = NULL, filename_filter) {
+                            MPCscore = NULL, filename_filter) {
   
   # Loop through each subdirectory
   for (subdir in subdir_list) {
@@ -261,14 +261,6 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
       # frequency greater than the input value (if provided).
       if (!is.null(maxpopfreq)) {
         df <- subset(df, MaxPopFreq < maxpopfreq)
-      }
-      
-      # Filters the data frame to remove any variants with a GATK count greater 
-      # than the input value (if provided).
-      if (!is.null(gatkcounts)) {
-        # Convert GATK.counts to numeric and remove decimal part
-        df$GATK.counts <- as.numeric(df$GATK.counts)
-        df <- subset(df, floor(df$GATK.counts) < gatkcounts)
       }
       
       # Filters the data frame to remove any variants with a MPC score greater

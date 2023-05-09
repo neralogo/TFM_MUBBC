@@ -391,7 +391,7 @@ print(var_imp)
 varImpPlot(rf_model, main = "Variable importance of model", sort = T)
 
 #Plot the tree for the model
-reprtree::plot.getTree(rf_model, k = 4)
+reprtree::plot.getTree(rf_model)
 
 # Define the function to calculate the percentage of positive cases
 calc_percentage <- function(data) {
