@@ -397,13 +397,13 @@ reprtree::plot.getTree(rf_model)
 calc_percentage <- function(data) {
   # Split the patients to 7 groups based on the values for each variable on 
   # each node
-  split1 <- ifelse(data$Age_walking <= 12,
-                   ifelse(data$Age_walking <= 10.7,
-                          ifelse(data$Age_F_Birth <= 35, "Group1", "Group2"),
-                          ifelse(data$Age_M_Birth <= 29.5, "Group3", "Group4")),
-                   ifelse(data$Age_F_Birth <= 39.7, 
-                          ifelse(data$Epilepsy == "Yes", "Group5", "Group6"),
-                          "Group7"))
+  split1 <- ifelse(data$Age_F_Birth <= 25.5,
+                   ifelse(data$Age_M_Birth <= 25.5, 
+                          ifelse(data$Age_walking <=16, "Group1", "Group2"),
+                          "Group3"),
+                   ifelse(data$Age_M_Birth <= 29.5,
+                          ifelse(data$Age_F_Birth <= 40, "Group4", "Group5"),
+                          ifelse(data$Age_walking <= 17.5, "Group6", "Group7")))
   
   # Create a new data frame with the groups and Exome variable
   groups <- data.frame(Group = split1, Exome = data$Exome)
@@ -420,8 +420,7 @@ calc_percentage <- function(data) {
   return(percentage_positive$Exome)
 }
 
-# Check the patient distribution in each group
-table(split1)
+
 
 # Set the bootstraping value to 1000
 n_boot <- 1000
