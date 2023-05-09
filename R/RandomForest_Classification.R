@@ -184,11 +184,11 @@ for (method in sampling_methods) {
   
   # Convert predicted probabilities to predicted class levels (Positive or 
   # Negative)
-  pred_class <- ifelse(pred_prob < 0.5, "Negative", "Positive")
+  pred_class <- ifelse(pred_prob > 0.5, "Positive", "Negative")
   
   # Generate the confusion matrix using the predicted class levels and true 
   # classes
-  cm <- confusionMatrix(data = as.factor(pred_class), 
+  cm <- confusionMatrix(data = as.factor(pred_class), positive = "Positive",
                         reference = test_balance$Exome, mode = "prec_recall")
   
   # Store the evaluation metrics for the current sampling method in a dataframe
@@ -197,7 +197,8 @@ for (method in sampling_methods) {
     AUC = roc(test_balance$Exome, pred_prob)$auc,
     Precision = cm$byClass["Precision"],
     Sensitivity = cm$byClass["Sensitivity"],
-    F1 = cm$byClass["F1"]
+    Specificity = cm$byClass["Specificity"],
+    Accuracy = cm$byClass["Balanced Accuracy"]
   )
   
 }
@@ -284,14 +285,15 @@ for (maxnodes in maxnodes_values) {
         
         # Train random forest model on the training set
         rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
-                            ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
+                                 ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
         
         # Make predictions on the validation set using the trained model
         rf_pred <- predict(rf_model, newdata = valid_cv)
         
         # Calculate the confusion matrix and accuracy score for this fold
-        confusion_matrix <- table(valid_cv$Exome, rf_pred)
-        accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
+        confusion_matrix <- confusionMatrix(data = rf_pred, reference = valid_cv$Exome, 
+                                            positive = "Positive")
+        accuracy <- confusion_matrix$overall["Accuracy"]
         
         # Add the accuracy to the running total for this combination of 
         # hyperparameters
@@ -335,12 +337,14 @@ rf_model <- randomForest(Exome ~ ., data = train_RF, importance = TRUE,
 rf_pred <- predict(rf_model, newdata = test_RF)
 
 # Calculate the confusion matrix and accuracy of the predictions
-confusion_matrix <- table(test_RF$Exome, rf_pred)
-accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
+confusion_matrix <- confusionMatrix(data = rf_pred, reference = test_RF$Exome, 
+                positive = "Positive")
 
-# Compute sensitivity and F1 score
-sensitivity_val <- sensitivity(confusion_matrix)
-f1_score_val <- F_meas(confusion_matrix)
+accuracy <- confusion_matrix$overall["Accuracy"]
+
+# Compute sensitivity and sens score
+sensitivity_val <- confusion_matrix$byClass["Sensitivity"]
+specificity_val <- confusion_matrix$byClass["Specificity"]
 
 # Compute ROC curve and ROC AUC score
 roc_obj <- roc(test_RF$Exome, predict(rf_model, newdata = test_RF, 
@@ -351,10 +355,10 @@ roc_auc <- auc(roc_obj)
 # score on the test set
 cat("\nAccuracy on test set:", accuracy)
 cat("\nSensitivity on test set:", sensitivity_val)
-cat("\nF1 score on test set:", f1_score_val)
+cat("\nSpecificity score on test set:", specificity_val)
 cat("\nROC AUC score on test set:", roc_auc)
 cat("\n\nConfusion Matrix:")
-print(confusion_matrix)
+print(confusion_matrix$table)
 
 # Plot ROC curve
 plot(roc_obj, main = "ROC curve")
@@ -390,20 +394,20 @@ print(var_imp)
 # Plot the variable importance scores for each variable
 varImpPlot(rf_model, main = "Variable importance of model", sort = T)
 
-#Plot the tree for the model
-reprtree::plot.getTree(rf_model)
+ #Plot the tree for the model
+reprtree::plot.getTree(rf_model, k=2)
 
 # Define the function to calculate the percentage of positive cases
 calc_percentage <- function(data) {
   # Split the patients to 7 groups based on the values for each variable on 
   # each node
-  split1 <- ifelse(data$Age_F_Birth <= 25.5,
-                   ifelse(data$Age_M_Birth <= 25.5, 
-                          ifelse(data$Age_walking <=16, "Group1", "Group2"),
-                          "Group3"),
-                   ifelse(data$Age_M_Birth <= 29.5,
-                          ifelse(data$Age_F_Birth <= 40, "Group4", "Group5"),
-                          ifelse(data$Age_walking <= 17.5, "Group6", "Group7")))
+  split1 <- ifelse(data$Age_walking <= 12.5,
+                   ifelse(data$Age_symptoms == "1-3", "Group3", 
+                          ifelse(data$Age_F_Birth <=34.5, "Group1", "Group2")),
+                   ifelse(data$Age_M_Birth <= 33.5,
+                          ifelse(data$Age_walking <= 22.5, "Group4", "Group5"),
+                          "Group6"))
+  
   
   # Create a new data frame with the groups and Exome variable
   groups <- data.frame(Group = split1, Exome = data$Exome)
@@ -415,7 +419,7 @@ calc_percentage <- function(data) {
   
   # Use complete to ensure that all groups are included in each bootstrap sample
   percentage_positive <- complete(percentage_positive, Group = c("Group1", 
-                  "Group2", "Group3", "Group4", "Group5", "Group6", "Group7"))
+                  "Group2", "Group3", "Group4", "Group5", "Group6"))
   
   return(percentage_positive$Exome)
 }
@@ -447,7 +451,7 @@ boot_ci <- t(apply(boot_results, 2, function(x) quantile(x,
 
 # Combine mean and confidence interval into a data frame
 boot_summary <- data.frame(Group = c("Group1", "Group2", "Group3", "Group4", 
-                                     "Group5", "Group6", "Group7"),
+                                     "Group5", "Group6"),
                            Mean = boot_mean,
                            Lower_CI = boot_ci[,1],
                            Upper_CI = boot_ci[,2])
