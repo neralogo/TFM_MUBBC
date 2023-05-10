@@ -394,8 +394,14 @@ print(var_imp)
 # Plot the variable importance scores for each variable
 varImpPlot(rf_model, main = "Variable importance of model", sort = T)
 
- #Plot the tree for the model
-reprtree::plot.getTree(rf_model, k = 2)
+# Get OOB errors for each tree in the model
+tree_errors <- rf_model$err.rate[,"OOB"]
+
+# Select tree with lowest OOB error to plot
+which.min(tree_errors)
+
+# Plot the tree for the model
+reprtree::plot.getTree(rf_model, k =2)
 
 # Define the function to calculate the percentage of positive cases
 calc_percentage <- function(data) {
