@@ -38,7 +38,7 @@ df <- df%>%mutate_at(vars(2:9), as.numeric)
 # Recode factor variables for easier interpretation
 df <- df %>%
   mutate(Exome = recode_factor(Exome, "0" = "Negative", "1" = "Positive")) %>%
-  mutate(Gender = recode_factor(Gender, "1" = "Male", "2" = "Female")) %>%
+  mutate(Sex = recode_factor(Sex, "1" = "Male", "2" = "Female")) %>%
   mutate(Epilepsy = recode_factor(Epilepsy, "0" = "No", "1" = "Probably", 
                                   "2" = "Yes")) %>%
   mutate(Regression = recode_factor(Regression, "0" = "No", "1" = "Yes")) %>%
