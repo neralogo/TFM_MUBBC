@@ -29,7 +29,8 @@ neither parent has the mutation.
 }
 \examples{
 
-df <- data.frame(IDs = c("G01-GEA-1234-MA,G01-GEA-1234-HI", "G01-GEA-5678-MA,G01-GEA-5678-PA,G01-GEA-5678-HI", "G01-GEA-9101-HI"))
+df <- data.frame(IDs = c("G01-GEA-1234-MA,G01-GEA-1234-HI", "G01-GEA-5678-MA,
+G01-GEA-5678-PA,G01-GEA-5678-HI", "G01-GEA-9101-HI"))
 # Keep only rows where ID "G01-GEA-1234" has "-HI" and not "-MA" or "-PA"
 keep_de_novo(df, "G01-GEA-1234")
 }

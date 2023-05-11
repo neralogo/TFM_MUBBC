@@ -1,6 +1,7 @@
 \name{calc_percentage}
 \alias{calc_percentage}
-\title{Calculate the percentage of positive cases for groups based on patient data}
+\title{Calculate the percentage of positive cases for groups based on patient 
+data}
 \usage{
   calc_percentage(data)
 }
