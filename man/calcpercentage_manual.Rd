@@ -1,7 +1,6 @@
 \name{calc_percentage}
 \alias{calc_percentage}
-\title{Calculate the percentage of positive cases for groups based on patient 
-data}
+\title{Calculate the percentage of positive cases for groups based on patient data}
 \usage{
   calc_percentage(data)
 }
@@ -17,7 +16,6 @@ data}
   The function first splits the patients into 7 groups based on the following 
   criteria:
   
-  \begin{enumerate}
     \item Age at walking <= 12 and age at first birth <= 35 (Group1)
     \item Age at walking <= 10.7 and age at first birth > 35 (Group2)
     \item Age at walking > 12 and age at first birth <= 29.5 (Group3)
