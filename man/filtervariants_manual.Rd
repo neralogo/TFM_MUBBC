@@ -21,16 +21,17 @@ filtered out.}
 \item{gatkcounts}{an optional integer value specifying the maximum allowed
 GATK count of a variant. If specified, variants with a GATK count
 greater than this value will be filtered out.}
-\item{MPCscore}{an optional numeric value specifying the maximum allowed MPC score
-of a variant. If specified, variants with an MPC score greater than
+\item{MPCscore}{an optional numeric value specifying the maximum allowed MPC 
+score of a variant. If specified, variants with an MPC score greater than
 this value will be filtered.}
 \item{filename_filter}{a character string to be included in the filtered file
 names to distinguish them from the original files}
 }
 \description{
 This function reads in CSV files containing variant data, and filters the
-variants based on the specified type (either "PTV" or "\emph{missense}") and various
-optional filtering parameters. The filtered data is saved as a new CSV file.
+variants based on the specified type (either "PTV" or "\emph{missense}") and 
+various optional filtering parameters. The filtered data is saved as a new CSV 
+file.
 }
 \details{
 For each specified subdirectory, the function looks for CSV files with names
