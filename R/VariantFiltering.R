@@ -273,7 +273,8 @@ filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL,
       # Keeps only the rows where OMIM_ID is not NA
       df <- df[!is.na(df$OMIM_ID),]
       
-      # Filters the data frame to remove any rows containing "MA" or "PA" in the "Padded_IDs_short" column.
+      # Filters the data frame to remove any rows containing "MA" or "PA" in the 
+      # "Padded_IDs_short" column.
       df <- subset(df, !grepl("MA|PA", Padded_IDs_short))
       
       # Creates a new file with the filtered data and writes it to disk. The 
