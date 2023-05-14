@@ -11,7 +11,7 @@ Exomas_HGUGM_autismo <- read.delim("Exomas_HGUGM_autismo.tab")
 Exomas_HGUGM_autismo <-  data.frame(lapply(Exomas_HGUGM_autismo, 
                    function(x) ifelse(is.na(x) | x == "","NA", x)))
 
-# Prepend "chr" to the chromosome column
+# Add "chr" to each value in the chromosome column
 Exomas_HGUGM_autismo$Chr <- paste0("chr", Exomas_HGUGM_autismo$Chr)
 
 # Convert start positions to numeric values and subtract 1 (bedtools requires 
@@ -39,9 +39,10 @@ rm(Exomas_HGUGM_autismo)
 #####################DATA PREPROCESSING########################################
 
 # Replace "|" with "," in GATK.samples column
-# Replace "_" with "-" in GATK.samples column
 Exomas_ASD_autismo$GATK.samples <- gsub("\\|", ",", 
                                        Exomas_ASD_autismo$GATK.samples)
+
+# Replace "_" with "-" in GATK.samples column
 Exomas_ASD_autismo$GATK.samples <- gsub("_", "-", 
                                        Exomas_ASD_autismo$GATK.samples)
 
@@ -102,6 +103,7 @@ Exomas_ASD_autismo$Padded_IDs <- gsub(",+", ",",
 Exomas_ASD_autismo$Padded_IDs <- gsub("[:,]+$", "", 
                                       Exomas_ASD_autismo$Padded_IDs)
 
+# Create a new column to store the new Padded IDs
 Exomas_ASD_autismo$Padded_IDs_short <- ""
 
 # Loop through each row in the dataframe 
@@ -124,7 +126,7 @@ for (i in 1:nrow(Exomas_ASD_autismo)) {
       ids[j] <- substr(ids[j], start = 1, stop = 14)
     }
   }
-  # Update the Padded_IDs column with the modified IDs
+  # Store in the Padded_IDs_short column the modified IDs
   Exomas_ASD_autismo$Padded_IDs_short[i] <- paste(ids, collapse = ", ")
 }
 
@@ -166,6 +168,7 @@ keep_de_novo <- function(df, id) {
   df[keep_rows, ]
 }
 
+# Save the subdirectories path
 dir_path <- "Split/"
 
 # Get a list of all subdirectories (i.e., unique IDs) in the directory
@@ -173,6 +176,7 @@ subdir_list <- list.dirs(dir_path, recursive = FALSE)
 
 # Loop through each subdirectory
 for (subdir in subdir_list) {
+  
   # Get the unique ID from the subdirectory name
   id <- basename(subdir)
   
@@ -198,33 +202,10 @@ for (subdir in subdir_list) {
 
 #####################VARIANT FILTERING########################################
 
-#··················Filtering CLINVAR pathogenic variants······················
-
-# Loop through each subdirectory
-for (subdir in subdir_list) {
-  
-  # Get a list of all "HI_only_" files in the subdirectory
-  file_list <- list.files(paste0(subdir, "/"), pattern = "^HI_", 
-                          full.names = TRUE)
-  
-  # Loop through each "HI_only_" file in the subdirectory and apply the function
-  for (file in file_list) {
-    # Read in the CSV file as a data frame
-    df <- read.csv(file, header = TRUE, stringsAsFactors = FALSE)
-    
-    # Filter rows that contain "Pathogenic" in the "ClinVar_Significance" column
-    df_pathogenic <- subset(df, ClinVar_Significance == "Pathogenic")
-    
-    # Create a new file name without the "HI_only_" prefix
-    new_filename <- gsub("^HI_", "", basename(file))
-    new_filename <- paste0(subdir, "/", new_filename, "_path_var_clinvar.csv")
-    
-    # Write a new file with the filtered data frame and the new file name
-    write.csv(df_pathogenic, file = new_filename, row.names = FALSE)
-  }
-}
-
 #···················Filtering de novo pathogenic variants······················
+
+# Create a function that filters specific variants in data frames given certain
+# criteria.
 
 filter_variants <- function(subdir_list, variant_type, maxpopfreq = NULL, 
                             MPCscore = NULL, filename_filter) {
@@ -296,7 +277,7 @@ filter_variants(subdir_list = subdir_list, variant_type = "PTV",
 filter_variants(subdir_list = subdir_list, variant_type = "missense", 
 maxpopfreq = 0.01, gatkcounts = 25, MPCscore = 2, filename_filter =  "de_novo")
 
-# Read in the data file
+# Read in the data file containing the pLI scores for a group of genes
 data_pLI <- read.delim("~/NERA/gnomad.v2.1.1.lof_metrics.by_gene.txt")
 
 # Convert pLI column to numeric and filter based on pLI value
@@ -306,10 +287,10 @@ data_pLI_filtered <- subset(data_pLI, pLI >= 0.9)
 # Subset data to only relevant columns and format chromosome column (chr, start,
 # end)
 data_pLI_filtered_intersectq <- data_pLI_filtered[,75:77]
+
 # Format chromosome column (add "chr" prefix)
 data_pLI_filtered_intersect$chromosome <- paste0("chr", 
                                         data_pLI_filtered_intersect$chromosome)
-
 
 # Convert start_position column to numeric and subtract 1 from each value
 data_pLI_filtered_intersect$start_position <- as.numeric(
