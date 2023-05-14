@@ -27,7 +27,7 @@ mutations.
 A data frame containing only de novo mutations, i.e. mutations where
 neither parent has the mutation.
 }
-\examples{
+\examples{For illustrative purposes only, do not run directly.
 
 df <- data.frame(IDs = c("G01-GEA-1234-MA,G01-GEA-1234-HI", "G01-GEA-5678-MA,
 G01-GEA-5678-PA,G01-GEA-5678-HI", "G01-GEA-9101-HI"))

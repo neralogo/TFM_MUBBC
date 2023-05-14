@@ -40,7 +40,7 @@ The filtered data is saved as new CSV files with the same names as the original
 files, with the addition of the string "filtered_" and the input parameters to
 the file name.
 }
-\examples{
+\examples{For illustrative purposes only, do not run directly.
 
 Filter for missense variants with a maximum population frequency of 0.01
 and a GATK count less than 5 in the specified subdirectories

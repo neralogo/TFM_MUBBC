@@ -27,7 +27,7 @@
   argument (-b). The output is written to a file with the same name as the
   input file, with "_intersect.csv" appended to the end.
 }
-\examples{
+\examples{For illustrative purposes only, do not run directly.
   # Define a list of subdirectories
   subdir_list <- c("path/to/subdir1", "path/to/subdir2", "path/to/subdir3")
   
