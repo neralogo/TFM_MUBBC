@@ -17,7 +17,8 @@ library(ggtext)     # Provides a set of functions for using formatted text in
 library(pROC)     # Provides functions for analyzing and visualizing ROC curves
 library(plot3D)     # Provides functions for creating various types of 3D plots, 
 # including surface plots, scatter plots, and wireframe plots. 
-
+library(reprtree)   # Provides functions for visualizing decision trees with 
+# annotated nodes, including classification and regression trees.
 
 # Sets the seed for reproducibility
 set.seed(123)
@@ -198,7 +199,7 @@ for (method in sampling_methods) {
     Precision = cm$byClass["Precision"],
     Sensitivity = cm$byClass["Sensitivity"],
     Specificity = cm$byClass["Specificity"],
-    Accuracy = cm$byClass["Balanced Accuracy"]
+    Accuracy = cm$overall["Accuracy"]
   )
   
 }
@@ -285,21 +286,20 @@ for (maxnodes in maxnodes_values) {
         
         # Train random forest model on the training set
         rf_model <- randomForest(Exome ~ ., data = train_cv, importance = TRUE, 
-                                 ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
+                          ntree = ntree, maxnodes = maxnodes, mtry = bestmtry)
         
         # Make predictions on the validation set using the trained model
         rf_pred <- predict(rf_model, newdata = valid_cv)
         
         # Calculate the confusion matrix and accuracy score for this fold
-        confusion_matrix <- confusionMatrix(data = rf_pred, reference = valid_cv$Exome, 
-                                            positive = "Positive")
+        confusion_matrix <- confusionMatrix(data = rf_pred, 
+                            reference = valid_cv$Exome, positive = "Positive")
         accuracy <- confusion_matrix$overall["Accuracy"]
         
         # Add the accuracy to the running total for this combination of 
         # hyperparameters
         avg_accuracy <- avg_accuracy + accuracy
-        
-      }  # End of cross-validation loop
+      }
       
       # Calculate the average accuracy across all folds for this combination of 
       # hyperparameters
@@ -340,9 +340,10 @@ rf_pred <- predict(rf_model, newdata = test_RF)
 confusion_matrix <- confusionMatrix(data = rf_pred, reference = test_RF$Exome, 
                 positive = "Positive")
 
+# Store the accuracy measure
 accuracy <- confusion_matrix$overall["Accuracy"]
 
-# Compute sensitivity and sens score
+# Compute sensitivity and specificity score
 sensitivity_val <- confusion_matrix$byClass["Sensitivity"]
 specificity_val <- confusion_matrix$byClass["Specificity"]
 
@@ -351,7 +352,7 @@ roc_obj <- roc(test_RF$Exome, predict(rf_model, newdata = test_RF,
                                       type = "prob")[,2])
 roc_auc <- auc(roc_obj)
 
-# Print the confusion matrix, accuracy, sensitivity, F1 score, and ROC AUC 
+# Print the confusion matrix, accuracy, sensitivity, specificity, and ROC AUC 
 # score on the test set
 cat("\nAccuracy on test set:", accuracy)
 cat("\nSensitivity on test set:", sensitivity_val)
@@ -401,7 +402,7 @@ tree_errors <- rf_model$err.rate[,"OOB"]
 which.min(tree_errors)
 
 # Plot the tree for the model
-reprtree::plot.getTree(rf_model, k =2)
+plot.getTree(rf_model, k =2)
 
 # Define the function to calculate the percentage of positive cases
 calc_percentage <- function(data) {
@@ -446,7 +447,7 @@ boot_results <- replicate(n_boot, {
 # for a single group across all bootstrap samples
 boot_results <- t(boot_results)
 
-# Replace NA values in the secon column with 0, as there are missing values in
+# Replace NA values in the second column with 0, as there are missing values in
 # some of the bootstrap samples
 boot_results[, 2] <- replace(boot_results[, 2], is.na(boot_results[, 2]), 0)
 
